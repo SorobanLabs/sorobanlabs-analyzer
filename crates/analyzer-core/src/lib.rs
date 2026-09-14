@@ -5,5 +5,14 @@
 //! upgrade plans. It orchestrates the other crates rather than performing
 //! low-level Stellar/Soroban parsing itself.
 //!
-//! The domain model is introduced incrementally; this initial version
-//! establishes the crate only.
+//! The domain model is introduced incrementally. This version
+//! establishes the shared typed error model (see [`error`]); the
+//! remaining domain types (analysis input, policy, findings, confidence,
+//! severity, status, upgrade plans) are added in later steps.
+
+mod error;
+
+pub use error::{
+    AnalysisError, AnalyzerError, BackendError, ConfigurationError, InvalidInputError,
+    SerializationError, UnsupportedArtifactError,
+};
