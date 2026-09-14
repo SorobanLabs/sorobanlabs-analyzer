@@ -1,0 +1,20 @@
+[package]
+name = "analyzer-executable"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Executable artifact loading, hashing, WASM inspection, and interface diffing."
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+sha2.workspace = true
+hex.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

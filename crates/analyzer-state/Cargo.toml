@@ -1,0 +1,28 @@
+[package]
+name = "analyzer-state"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Contract state representation, snapshots, and state compatibility analysis."
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+# Pinned transitively via toml_edit to keep the resolved graph on the
+# 1.84.0 MSRV; newer indexmap/toml_edit releases require edition2024.
+indexmap = "=2.5.0"
+toml_edit = "=0.22.20"
+
+[dev-dependencies]
+proptest.workspace = true
+# Pinned transitively via proptest/rusty-fork to keep the resolved graph
+# on the 1.84.0 MSRV; newer tempfile releases pull in getrandom 0.4,
+# which requires edition2024.
+tempfile = "=3.14.0"
+
+[lints]
+workspace = true

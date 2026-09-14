@@ -1,0 +1,42 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/analyzer-core",
+    "crates/analyzer-executable",
+    "crates/analyzer-state",
+    "crates/analyzer-auth",
+    "crates/analyzer-evidence",
+    "crates/analyzer-report",
+    "crates/analyzer-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.84.0"
+license = "Apache-2.0"
+repository = "https://github.com/SorobanLabs/sorobanlabs-analyzer"
+
+[workspace.dependencies]
+analyzer-core = { path = "crates/analyzer-core" }
+analyzer-executable = { path = "crates/analyzer-executable" }
+analyzer-state = { path = "crates/analyzer-state" }
+analyzer-auth = { path = "crates/analyzer-auth" }
+analyzer-evidence = { path = "crates/analyzer-evidence" }
+analyzer-report = { path = "crates/analyzer-report" }
+serde = { version = "=1.0.215", features = ["derive"] }
+serde_json = "=1.0.133"
+thiserror = "=2.0.9"
+sha2 = "=0.10.8"
+toml = "=0.8.19"
+hex = "=0.4.3"
+clap = { version = "=4.5.20", features = ["derive"] }
+proptest = "=1.5.0"
+
+[profile.release]
+opt-level = "z"
+lto = true
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

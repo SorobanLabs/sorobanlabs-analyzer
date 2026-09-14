@@ -1,0 +1,18 @@
+[package]
+name = "analyzer-auth"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Authorization-surface extraction and comparison for the SorobanLabs Analyzer."
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true
