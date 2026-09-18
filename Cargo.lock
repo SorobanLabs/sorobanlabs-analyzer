@@ -46,6 +46,7 @@ dependencies = [
 name = "analyzer-executable"
 version = "0.1.0"
 dependencies = [
+ "analyzer-core",
  "hex",
  "proptest",
  "serde",

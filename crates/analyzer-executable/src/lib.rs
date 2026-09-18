@@ -6,4 +6,12 @@
 //! normalization, and current-vs-candidate executable comparison.
 //! All outputs must be deterministic.
 //!
-//! This initial version establishes the crate only.
+//! This version establishes local WASM artifact loading and canonical
+//! byte-level identity ([`LoadedWasm`], [`ArtifactHash`],
+//! [`ArtifactSource`]). WASM semantic inspection, Soroban contract
+//! specification extraction, and interface diffing are added in later
+//! steps.
+
+mod artifact;
+
+pub use artifact::{ArtifactHash, ArtifactSource, LoadedWasm};
