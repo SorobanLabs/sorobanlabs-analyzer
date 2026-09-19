@@ -18,6 +18,7 @@ mod artifact;
 mod contract_meta;
 mod contract_spec;
 mod environment_meta;
+mod interface;
 mod validation;
 
 pub use artifact::{ArtifactHash, ArtifactSource, LoadedWasm};
@@ -29,6 +30,12 @@ pub use contract_spec::{parse_contract_spec, ContractSpecReport, CONTRACT_SPEC_S
 pub use environment_meta::{
     parse_environment_metadata, EnvironmentInterfaceVersion, EnvironmentMetaReport,
     CONTRACT_ENV_META_SECTION,
+};
+pub use interface::{
+    normalize_interface, EventDataFormat, EventParamLocation, NormalizedEnum, NormalizedEnumCase,
+    NormalizedErrorEnum, NormalizedErrorEnumCase, NormalizedEvent, NormalizedEventParameter,
+    NormalizedFunction, NormalizedInterface, NormalizedParameter, NormalizedStruct,
+    NormalizedStructField, NormalizedType, NormalizedUnion, NormalizedUnionCase,
 };
 pub use validation::{
     check_soroban_structural_compatibility, validate_generic_wasm, SorobanStructuralReport,
