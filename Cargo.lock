@@ -70,6 +70,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "analyzer-rehearsal"
+version = "0.1.0"
+dependencies = [
+ "analyzer-state",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "analyzer-report"
 version = "0.1.0"
 dependencies = [

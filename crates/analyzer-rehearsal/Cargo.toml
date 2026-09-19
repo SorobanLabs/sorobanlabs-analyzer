@@ -1,0 +1,18 @@
+[package]
+name = "analyzer-rehearsal"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Controlled upgrade rehearsal: typed inputs, observations, traces, and outcomes for the SorobanLabs Analyzer."
+
+[dependencies]
+analyzer-state.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

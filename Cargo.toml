@@ -7,6 +7,7 @@ members = [
     "crates/analyzer-auth",
     "crates/analyzer-evidence",
     "crates/analyzer-report",
+    "crates/analyzer-rehearsal",
     "crates/analyzer-cli",
 ]
 
@@ -24,6 +25,7 @@ analyzer-state = { path = "crates/analyzer-state" }
 analyzer-auth = { path = "crates/analyzer-auth" }
 analyzer-evidence = { path = "crates/analyzer-evidence" }
 analyzer-report = { path = "crates/analyzer-report" }
+analyzer-rehearsal = { path = "crates/analyzer-rehearsal" }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
 thiserror = "=2.0.20"
