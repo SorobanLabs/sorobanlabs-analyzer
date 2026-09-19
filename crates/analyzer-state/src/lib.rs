@@ -10,8 +10,10 @@
 //! evidence is missing. Those compatibility rules, the read-only RPC
 //! source, and the migration manifest model are added in later steps.
 
+mod rpc;
 mod snapshot;
 mod source;
 
+pub use rpc::{DataKeyRequest, RpcStateSource, Transport, UreqTransport};
 pub use snapshot::{ContractDataEntrySnapshot, Durability, ExecutableForm, StateSnapshot};
 pub use source::{LocalSnapshotSource, StateSource};

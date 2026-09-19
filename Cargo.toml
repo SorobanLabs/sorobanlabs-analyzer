@@ -43,7 +43,23 @@ wasmparser = "=0.116.1"
 # (verified against https://github.com/stellar/rs-stellar-xdr), so it
 # fits this workspace's MSRV without modification. Default features
 # (`std`, `curr`) are used: `curr` tracks the current protocol XDR.
-stellar-xdr = "=28.0.0"
+stellar-xdr = { version = "=28.0.0", features = ["base64"] }
+# ureq's 3.x line declares MSRV 1.85 (above this workspace's 1.84.0);
+# the 2.x line declares MSRV 1.71 and is used instead, for the
+# read-only Soroban RPC client. Blocking (matches this workspace's
+# entirely synchronous architecture; no async runtime is otherwise
+# needed) and small (no tokio/hyper dependency tree).
+#
+# Two of ureq's transitive dependencies (idna_adapter, pulled in via
+# `url`, and zeroize, pulled in via `ring`) publish newer releases that
+# require edition2024; Cargo.lock pins them to idna_adapter 1.2.0 and
+# zeroize 1.8.1 to stay on 1.84.0. Both are non-cryptographic-logic
+# packaging/size changes in their newer releases (no RustSec advisory
+# applies to either the pinned or newer version at the time this was
+# written); the resolved `idna` crate itself (1.1.0) is well above the
+# version RUSTSEC-2024-0421 was fixed in (1.0.3), so no known
+# vulnerability is reintroduced by these two pins.
+ureq = "=2.12.1"
 
 [profile.release]
 opt-level = "z"
