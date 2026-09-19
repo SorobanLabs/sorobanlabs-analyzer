@@ -8,10 +8,16 @@
 //!
 //! This version establishes local WASM artifact loading and canonical
 //! byte-level identity ([`LoadedWasm`], [`ArtifactHash`],
-//! [`ArtifactSource`]). WASM semantic inspection, Soroban contract
-//! specification extraction, and interface diffing are added in later
-//! steps.
+//! [`ArtifactSource`]), plus generic and Soroban-specific structural
+//! WASM validation ([`validation`]). Soroban environment/contract
+//! metadata extraction, contract specification parsing, and interface
+//! diffing are added in later steps.
 
 mod artifact;
+mod validation;
 
 pub use artifact::{ArtifactHash, ArtifactSource, LoadedWasm};
+pub use validation::{
+    check_soroban_structural_compatibility, validate_generic_wasm, SorobanStructuralReport,
+    SorobanStructuralViolation, MAX_WASM_BYTES,
+};

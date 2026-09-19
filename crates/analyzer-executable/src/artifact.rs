@@ -1,11 +1,19 @@
 //! Local WASM artifact loading and canonical byte-level identity.
 //!
-//! This module establishes the analyzer's *Level 1* artifact model: a
-//! byte sequence that has been confirmed to be structurally a WASM
-//! binary. It does not attempt to determine whether that WASM binary is
-//! a supported Soroban executable (Level 2), or whether it is a
-//! semantically analyzable Soroban contract (Level 3). Those
-//! distinctions belong to later steps.
+//! This module establishes the analyzer's artifact model across the
+//! first two evidence levels described in the crate documentation:
+//!
+//! - **Level 1**, generic WebAssembly structural validity, established
+//!   by [`crate::validation::validate_generic_wasm`].
+//! - **Level 1.5**, Soroban structural compatibility (the module has no
+//!   structural feature the official Soroban host is known to reject),
+//!   established by [`crate::validation::check_soroban_structural_compatibility`]
+//!   and exposed on every [`LoadedWasm`] as [`LoadedWasm::soroban_structural`].
+//!
+//! Neither level determines whether the module is a *supported Soroban
+//! executable* (Level 2, environment/contract metadata) or a
+//! semantically analyzable contract (Level 3). Those distinctions
+//! belong to later steps.
 //!
 //! # Identity
 //!
@@ -21,29 +29,14 @@
 //! this module makes no attempt to detect that. Conversely, identical
 //! bytes always produce the identical hash regardless of where they
 //! were loaded from.
-//!
-//! # WASM validation
-//!
-//! Structural WASM identification here is limited to checking the
-//! standard 8-byte WASM binary header: the `\0asm` magic number followed
-//! by the little-endian version `1`. This is deliberately minimal: a
-//! full parser or validator is not pulled in as a dependency merely to
-//! check eight header bytes. Host import validation, custom section
-//! interpretation, and Soroban contract specification checks are left to
-//! later steps that need them.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use analyzer_core::{AnalyzerError, BackendError, InvalidInputError, UnsupportedArtifactError};
+use analyzer_core::{AnalyzerError, BackendError, InvalidInputError};
 use sha2::{Digest, Sha256};
 
-/// The WASM binary magic number: the ASCII/byte sequence `\0asm`.
-const WASM_MAGIC: [u8; 4] = [0x00, 0x61, 0x73, 0x6d];
-
-/// The WASM binary format version this analyzer recognizes (version 1,
-/// little-endian).
-const WASM_VERSION: [u8; 4] = [0x01, 0x00, 0x00, 0x00];
+use crate::validation::{self, SorobanStructuralReport};
 
 /// The canonical SHA-256 identity of an artifact's exact bytes.
 ///
@@ -103,27 +96,32 @@ pub enum ArtifactSource {
 /// A WASM artifact loaded from local storage.
 ///
 /// `LoadedWasm` preserves the exact bytes read from disk alongside their
-/// canonical [`ArtifactHash`] and their [`ArtifactSource`]. The type
-/// establishes the invariant `hash == ArtifactHash::of(&bytes)`: the
-/// hash is computed once at load time and cannot drift out of sync,
-/// because the bytes and hash are only ever exposed as immutable views.
+/// canonical [`ArtifactHash`], their [`ArtifactSource`], and their
+/// Soroban structural compatibility. The type establishes the invariant
+/// `hash == ArtifactHash::of(&bytes)`: the hash is computed once at load
+/// time and cannot drift out of sync, because the bytes and hash are
+/// only ever exposed as immutable views.
 ///
-/// Loading only confirms that the bytes carry a valid WASM binary
-/// header (Level 1). It does not confirm that the artifact is a
-/// supported Soroban executable (Level 2) or that it is semantically
+/// Loading confirms that the bytes are a structurally valid generic
+/// WASM module (Level 1) and records whether that module also passes
+/// Soroban's known structural restrictions (Level 1.5, see
+/// [`Self::soroban_structural`]). Neither confirms that the artifact is
+/// a supported Soroban executable (Level 2) or that it is semantically
 /// analyzable (Level 3).
 #[derive(Debug, Clone)]
 pub struct LoadedWasm {
     bytes: Vec<u8>,
     hash: ArtifactHash,
     source: ArtifactSource,
+    soroban_structural: SorobanStructuralReport,
 }
 
 impl LoadedWasm {
     /// Load a WASM artifact from a local filesystem path.
     ///
-    /// This reads the file's exact bytes, verifies the standard WASM
-    /// binary header, and computes the canonical [`ArtifactHash`] over
+    /// This reads the file's exact bytes, confirms they are a
+    /// structurally valid generic WASM module, checks Soroban structural
+    /// compatibility, and computes the canonical [`ArtifactHash`] over
     /// those bytes.
     ///
     /// # Errors
@@ -131,8 +129,8 @@ impl LoadedWasm {
     /// Returns [`InvalidInputError`] if `path` is empty. Returns a
     /// [`BackendError`] if the path cannot be read (missing file,
     /// permission denied, or the path names a directory). Returns an
-    /// [`UnsupportedArtifactError`] if the bytes read do not begin with
-    /// a valid WASM binary header.
+    /// [`analyzer_core::UnsupportedArtifactError`] if the bytes read are
+    /// not a structurally valid WASM module.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self, AnalyzerError> {
         let path = path.as_ref();
 
@@ -147,13 +145,15 @@ impl LoadedWasm {
             )
         })?;
 
-        validate_wasm_header(&bytes)?;
+        validation::validate_generic_wasm(&bytes)?;
+        let soroban_structural = validation::check_soroban_structural_compatibility(&bytes)?;
 
         let hash = ArtifactHash::of(&bytes);
         Ok(Self {
             bytes,
             hash,
             source: ArtifactSource::LocalFile(path.to_path_buf()),
+            soroban_structural,
         })
     }
 
@@ -171,25 +171,18 @@ impl LoadedWasm {
     pub fn source(&self) -> &ArtifactSource {
         &self.source
     }
-}
 
-/// Confirm that `bytes` begin with the standard WASM binary header: the
-/// `\0asm` magic number followed by version 1.
-///
-/// This is a purely structural check. It does not parse sections, and
-/// it makes no claim about whether the artifact is a supported Soroban
-/// executable.
-fn validate_wasm_header(bytes: &[u8]) -> Result<(), AnalyzerError> {
-    let header_ok = bytes.len() >= 8 && bytes[0..4] == WASM_MAGIC && bytes[4..8] == WASM_VERSION;
-
-    if !header_ok {
-        return Err(UnsupportedArtifactError::new(
-            "artifact is not a valid WASM binary: missing or unrecognized WASM header",
-        )
-        .into());
+    /// Whether this module has any structural feature the official
+    /// Soroban host is known to reject (start function, component-model
+    /// sections, exception-handling tags, memory64, or shared memory).
+    ///
+    /// An empty/compatible report is not a claim that the artifact is a
+    /// supported Soroban contract executable; environment metadata,
+    /// contract specification, and host import checks are separate,
+    /// later analysis stages.
+    pub fn soroban_structural(&self) -> &SorobanStructuralReport {
+        &self.soroban_structural
     }
-
-    Ok(())
 }
 
 #[cfg(test)]
