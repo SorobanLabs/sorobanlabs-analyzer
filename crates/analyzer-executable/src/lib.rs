@@ -17,6 +17,7 @@
 mod artifact;
 mod contract_meta;
 mod contract_spec;
+mod diff;
 mod environment_meta;
 mod interface;
 mod validation;
@@ -27,6 +28,10 @@ pub use contract_meta::{
     KNOWN_KEY_RUST_VERSION, KNOWN_KEY_SDK_VERSION,
 };
 pub use contract_spec::{parse_contract_spec, ContractSpecReport, CONTRACT_SPEC_SECTION};
+pub use diff::{
+    diff_interfaces, EnumChange, ErrorEnumChange, EventChange, FunctionChange, InterfaceDiff,
+    StructChange, UnionChange,
+};
 pub use environment_meta::{
     parse_environment_metadata, EnvironmentInterfaceVersion, EnvironmentMetaReport,
     CONTRACT_ENV_META_SECTION,
