@@ -8,8 +8,11 @@ repository.workspace = true
 description = "Domain model and orchestration for the SorobanLabs Analyzer."
 
 [dependencies]
+analyzer-evidence.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+sha2.workspace = true
+hex.workspace = true
 
 [lints]
 workspace = true
