@@ -16,6 +16,7 @@
 
 mod artifact;
 mod contract_meta;
+mod contract_spec;
 mod environment_meta;
 mod validation;
 
@@ -24,6 +25,7 @@ pub use contract_meta::{
     parse_contract_metadata, ContractMetaEntry, ContractMetaReport, CONTRACT_META_SECTION,
     KNOWN_KEY_RUST_VERSION, KNOWN_KEY_SDK_VERSION,
 };
+pub use contract_spec::{parse_contract_spec, ContractSpecReport, CONTRACT_SPEC_SECTION};
 pub use environment_meta::{
     parse_environment_metadata, EnvironmentInterfaceVersion, EnvironmentMetaReport,
     CONTRACT_ENV_META_SECTION,
