@@ -1,6 +1,11 @@
-//! The overall outcome of an upgrade analysis run.
+//! The overall outcome of an upgrade analysis run, and a human-oriented
+//! summary of its findings ([`plan`]).
 
 use std::fmt;
+
+mod plan;
+
+pub use plan::UpgradePlan;
 
 /// The top-level result of analyzing a proposed executable replacement.
 ///
