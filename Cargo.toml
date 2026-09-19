@@ -24,14 +24,26 @@ analyzer-state = { path = "crates/analyzer-state" }
 analyzer-auth = { path = "crates/analyzer-auth" }
 analyzer-evidence = { path = "crates/analyzer-evidence" }
 analyzer-report = { path = "crates/analyzer-report" }
-serde = { version = "=1.0.215", features = ["derive"] }
-serde_json = "=1.0.133"
-thiserror = "=2.0.9"
-sha2 = "=0.10.8"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+thiserror = "=2.0.20"
+sha2 = "=0.10.9"
 toml = "=0.8.19"
 hex = "=0.4.3"
 clap = { version = "=4.5.20", features = ["derive"] }
 proptest = "=1.5.0"
+# Pinned to the exact version the official rs-soroban-env workspace
+# pins (https://github.com/stellar/rs-soroban-env/blob/main/Cargo.toml,
+# `wasmparser = "=0.116.1"`), because Soroban's host requires this exact
+# wasmparser release to stay compatible with its Wasmi fork. Do not
+# upgrade independently of that upstream constraint.
+wasmparser = "=0.116.1"
+# stellar-xdr 28.0.0 matches the current released Stellar Protocol 28 /
+# soroban-env-host 28.x line and declares rust-version = "1.84.0"
+# (verified against https://github.com/stellar/rs-stellar-xdr), so it
+# fits this workspace's MSRV without modification. Default features
+# (`std`, `curr`) are used: `curr` tracks the current protocol XDR.
+stellar-xdr = "=28.0.0"
 
 [profile.release]
 opt-level = "z"

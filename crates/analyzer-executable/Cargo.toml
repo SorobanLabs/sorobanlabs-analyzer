@@ -13,6 +13,8 @@ serde.workspace = true
 thiserror.workspace = true
 sha2.workspace = true
 hex.workspace = true
+wasmparser.workspace = true
+stellar-xdr.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

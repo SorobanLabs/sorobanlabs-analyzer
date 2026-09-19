@@ -1,4 +1,15 @@
+# Development/CI toolchain. This is deliberately newer than the
+# workspace's declared MSRV (workspace.package.rust-version = "1.84.0"
+# in Cargo.toml, chosen to match the rust-version stellar-xdr 28.0.0
+# and soroban-env-host both declare). Rust 1.98.1 is pinned here mainly
+# because Cargo releases before 1.94.1 carry CVE-2026-33056 (a `tar`
+# extraction flaw that lets a malicious crate change filesystem
+# permissions during `cargo build`); building and running CI on a
+# patched Cargo removes that exposure regardless of the crate's own
+# MSRV promise. The resolved dependency graph is still verified against
+# rustc 1.84.0 directly (see MSRV check in CI) so the declared MSRV
+# stays honest.
 [toolchain]
-channel = "1.84.0"
+channel = "1.98.1"
 components = ["rustfmt", "clippy"]
 targets = ["wasm32v1-none"]
