@@ -8,8 +8,10 @@ repository.workspace = true
 description = "Authorization-surface extraction and comparison for the SorobanLabs Analyzer."
 
 [dependencies]
+analyzer-core.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+wasmparser.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
