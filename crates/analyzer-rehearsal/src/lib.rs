@@ -12,23 +12,28 @@
 //!
 //! # Current state
 //!
-//! This version establishes the typed model only: [`input::RehearsalInput`]
-//! (what to rehearse), [`observation::InvocationObservation`] (what was
-//! observed for one invocation on one side, including
+//! [`input::RehearsalInput`] (what to rehearse),
+//! [`observation::InvocationObservation`] (what was observed for one
+//! invocation on one side, including
 //! [`observation::ExecutionOutcome::Blocked`] for an invocation that
 //! could not be safely or meaningfully executed), and
 //! [`trace::RehearsalTrace`] (the bounded, two-sided collection of
-//! observations for a completed rehearsal). **No execution backend
-//! exists yet.** Building one requires a documented feasibility
-//! assessment of the official Soroban host implementation against this
-//! workspace (a later step); this crate does not substitute a generic
-//! WASM runtime for that assessment, and does not claim Soroban
-//! execution support until that assessment succeeds.
+//! observations for a completed rehearsal) establish the typed model.
+//! [`host`] is a real, verified (not assumed) local execution backend
+//! built on the official `soroban-env-host`; see that module's docs for
+//! the feasibility evidence and its current scope (return
+//! value/success/error/trap/blocked outcome only; events, state
+//! access, and resource usage are not yet captured). Rehearsal
+//! fixtures beyond the single minimal one this module's tests use, and
+//! comparing the two sides' observations into a behavioral diff, are
+//! later steps.
 
+pub mod host;
 pub mod input;
 pub mod observation;
 pub mod trace;
 
+pub use host::rehearse_invocation;
 pub use input::{ExecutionLimits, RehearsalInput, RehearsalInvocation};
 pub use observation::{
     EventObservation, ExecutionOutcome, InvocationObservation, ResourceUsage,

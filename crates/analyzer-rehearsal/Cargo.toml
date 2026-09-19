@@ -9,7 +9,9 @@ description = "Controlled upgrade rehearsal: typed inputs, observations, traces,
 
 [dependencies]
 analyzer-state.workspace = true
+hex.workspace = true
 serde.workspace = true
+soroban-env-host.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

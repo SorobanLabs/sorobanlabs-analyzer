@@ -62,6 +62,33 @@ stellar-xdr = { version = "=28.0.0", features = ["base64"] }
 # version RUSTSEC-2024-0421 was fixed in (1.0.3), so no known
 # vulnerability is reintroduced by these two pins.
 ureq = "=2.12.1"
+# soroban-env-host 28.0.2 is the released version matching stellar-xdr
+# 28.0.0 and wasmparser 0.116.1 exactly (verified against
+# https://github.com/stellar/rs-soroban-env/blob/v28.0.2/Cargo.toml,
+# and against soroban-sdk 28.0.0's own declared soroban-env-host
+# dependency, "=28.0.2"). Feasibility (Step 23) was verified by an
+# actual local build and a real invocation of a stellar-cli-built
+# Soroban contract through this exact dependency, not by inspection
+# alone. `testutils` is enabled: it is the officially-supported path
+# for loading and invoking a WASM contract without also constructing
+# the full transaction-level footprint/resource XDR that the
+# production `e2e_invoke::invoke_host_function` entry point expects;
+# it enables `recording_mode` (dynamic footprint recording, so a fresh
+# contract registration does not require pre-declaring it) and does
+# not pull soroban-env-host's own dev-dependencies into consumers.
+#
+# Building this dependency under 1.84.0 required five additional
+# Cargo.lock pins beyond the ureq-related ones above, all transitive,
+# none of them soroban-env-host's own code: cpufeatures (via
+# curve25519-dalek, downgraded from its default-resolved 5.0.0 to
+# 4.1.3, which the `>=4.1.3` constraint soroban-env-host itself
+# declares already allows), enum-ordinalize and enum-ordinalize-derive
+# (via ark-ec's `educe` dependency, pinned to 4.3.2), base64ct (pinned
+# to 1.7.3), and zeroize_derive (via zeroize, pinned to 1.4.3, matching
+# the zeroize 1.8.1 already pinned above). Each is a RustCrypto-ecosystem
+# utility crate; no RustSec advisory was found for any pinned or newer
+# version at the time this was written.
+soroban-env-host = { version = "=28.0.2", features = ["testutils"] }
 
 [profile.release]
 opt-level = "z"
