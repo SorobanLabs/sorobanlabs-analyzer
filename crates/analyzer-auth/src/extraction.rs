@@ -84,12 +84,25 @@ impl EntrypointAuthorization {
     }
 }
 
+/// The reserved export name Soroban's host calls to delegate
+/// authentication/authorization to a custom account contract, every
+/// time `require_auth`/`require_auth_for_args` is invoked for that
+/// contract's address. Verified against the official Stellar developer
+/// documentation
+/// (<https://developers.stellar.org/docs/learn/fundamentals/contract-development/authorization>):
+/// "`__check_auth` is a reserved function and can only be called by the
+/// Soroban environment in response to a call to `require_auth`."
+pub const CUSTOM_ACCOUNT_CHECK_AUTH_EXPORT: &str = "__check_auth";
+
 /// The authorization surface extracted from one WASM module.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AuthorizationSurface {
     /// True if the module imports at least one recognized authorization
     /// primitive, regardless of whether any code path reaches it.
     pub imports_auth_primitive: bool,
+    /// True if the module exports the reserved `__check_auth` function,
+    /// implementing a custom account authorization hook.
+    pub has_custom_auth_hook: bool,
     /// Every exported function, each with its direct authorization
     /// calls, sorted by export name for deterministic output.
     pub entrypoints: Vec<EntrypointAuthorization>,
@@ -204,9 +217,13 @@ pub fn extract_authorization_surface(bytes: &[u8]) -> Result<AuthorizationSurfac
         }
     }
     entrypoints.sort_by(|a, b| a.export_name.cmp(&b.export_name));
+    let has_custom_auth_hook = entrypoints
+        .iter()
+        .any(|entry| entry.export_name == CUSTOM_ACCOUNT_CHECK_AUTH_EXPORT);
 
     Ok(AuthorizationSurface {
         imports_auth_primitive: !auth_import_names.is_empty(),
+        has_custom_auth_hook,
         entrypoints,
     })
 }
@@ -351,5 +368,20 @@ mod tests {
         let surface = extract_authorization_surface(&module).unwrap();
         assert!(surface.entrypoints.is_empty());
         assert!(!surface.imports_auth_primitive);
+    }
+
+    #[test]
+    fn exported_check_auth_is_detected_as_custom_auth_hook() {
+        let module =
+            module_with_import_and_export("unrelated", CUSTOM_ACCOUNT_CHECK_AUTH_EXPORT, false);
+        let surface = extract_authorization_surface(&module).unwrap();
+        assert!(surface.has_custom_auth_hook);
+    }
+
+    #[test]
+    fn module_without_check_auth_export_has_no_custom_auth_hook() {
+        let module = module_with_import_and_export("unrelated", "transfer", false);
+        let surface = extract_authorization_surface(&module).unwrap();
+        assert!(!surface.has_custom_auth_hook);
     }
 }
