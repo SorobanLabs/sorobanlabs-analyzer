@@ -104,6 +104,7 @@
           "type": "string",
           "enum": [
             "EXECUTABLE_HASH_CHANGED",
+            "EXECUTABLE_STRUCTURALLY_INCOMPATIBLE",
             "ENVIRONMENT_INTERFACE_CHANGED",
             "ENVIRONMENT_METADATA_MISSING",
             "CONTRACT_INTERFACE_ADDED",

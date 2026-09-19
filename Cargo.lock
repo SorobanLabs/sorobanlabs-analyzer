@@ -30,6 +30,7 @@ dependencies = [
  "analyzer-report",
  "analyzer-state",
  "clap",
+ "tempfile",
 ]
 
 [[package]]

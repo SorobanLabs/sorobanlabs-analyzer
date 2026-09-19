@@ -8,6 +8,10 @@ repository.workspace = true
 description = "Command-line interface for the SorobanLabs Analyzer."
 default-run = "sorobanlabs-analyzer"
 
+[lib]
+name = "analyzer_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "sorobanlabs-analyzer"
 path = "src/main.rs"
@@ -20,6 +24,12 @@ analyzer-auth.workspace = true
 analyzer-evidence.workspace = true
 analyzer-report.workspace = true
 clap.workspace = true
+
+[dev-dependencies]
+# Pinned transitively via proptest/rusty-fork to keep the resolved graph
+# on the 1.84.0 MSRV; newer tempfile releases pull in getrandom 0.4,
+# which requires edition2024.
+tempfile = "=3.14.0"
 
 [lints]
 workspace = true

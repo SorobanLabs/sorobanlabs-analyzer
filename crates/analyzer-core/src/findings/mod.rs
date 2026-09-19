@@ -138,6 +138,13 @@ impl fmt::Display for FindingCategory {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Rule {
     ExecutableHashChanged,
+    /// The executable is structurally valid generic WASM but fails one
+    /// or more of Soroban's known structural requirements (start
+    /// section, component-model sections, memory64, shared memory; see
+    /// `analyzer_executable::validation`). Added when orchestration
+    /// (Step 20) needed a rule for this condition and the original
+    /// eighteen-rule catalog did not include one.
+    ExecutableStructurallyIncompatible,
     EnvironmentInterfaceChanged,
     EnvironmentMetadataMissing,
     ContractInterfaceAdded,
@@ -163,6 +170,7 @@ impl Rule {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::ExecutableHashChanged => "EXECUTABLE_HASH_CHANGED",
+            Self::ExecutableStructurallyIncompatible => "EXECUTABLE_STRUCTURALLY_INCOMPATIBLE",
             Self::EnvironmentInterfaceChanged => "ENVIRONMENT_INTERFACE_CHANGED",
             Self::EnvironmentMetadataMissing => "ENVIRONMENT_METADATA_MISSING",
             Self::ContractInterfaceAdded => "CONTRACT_INTERFACE_ADDED",
