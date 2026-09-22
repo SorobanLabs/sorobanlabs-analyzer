@@ -50,6 +50,7 @@ dependencies = [
  "analyzer-state",
  "clap",
  "hex",
+ "serde_json",
  "soroban-env-host",
  "tempfile",
 ]

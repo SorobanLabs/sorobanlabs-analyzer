@@ -22,9 +22,12 @@ an explicit confidence level.
   between the current and candidate executables.
 - Extracts and compares the authorization surface (entrypoint,
   authorization requirement, principal, check).
+- When given a rehearsal manifest, runs the same invocations against both
+  executables under a real, bounded Soroban host backend and reports
+  observed behavioral differences (return value, execution outcome).
 - Attaches evidence to every meaningful finding.
-- Produces a versioned, deterministic canonical JSON report, plus
-  Markdown and terminal renderings.
+- Produces a versioned, deterministic canonical JSON report, plus a
+  terminal rendering of the same data.
 
 ## What the analyzer does not do
 
@@ -73,9 +76,10 @@ crates/
   analyzer-executable   executable loading, WASM inspection, interface diff
   analyzer-state        state snapshots and compatibility analysis
   analyzer-auth         authorization surface extraction and diff
+  analyzer-rehearsal    controlled upgrade rehearsal (Soroban host backend)
   analyzer-evidence     evidence model backing findings
-  analyzer-report       JSON/Markdown/terminal report rendering
-  analyzer-cli          command-line interface (orchestration only)
+  analyzer-report       JSON report and terminal report rendering
+  analyzer-cli          command-line interface
 fixtures/    declarative fixtures used by the test suite
 schemas/     versioned JSON schemas for canonical output
 examples/    example inputs and outputs
@@ -86,12 +90,41 @@ scripts/     development and CI helper scripts
 
 ## Status
 
-This repository is in early, active development. The crate structure and
-toolchain are established; the analysis pipeline, CLI commands, and
-report schema are implemented incrementally. Controlled upgrade rehearsal
-(running old and candidate executables against representative state and
-comparing observable behavior) is a planned major subsystem and is not
-yet implemented.
+This repository is in early, active development. The analysis pipeline
+(executable identity, interface diff, state compatibility, authorization
+diff, and controlled rehearsal) and the `analyze` CLI command are
+implemented; further CLI commands and report formats are added
+incrementally as they are needed.
+
+## CLI usage
+
+```
+cargo run -p analyzer-cli -- analyze \
+  --current path/to/current.wasm \
+  --candidate path/to/candidate.wasm
+```
+
+Required: `--current` and `--candidate` (paths to the two executables).
+
+Optional:
+
+- `--protocol <NUMBER>`: the Soroban protocol number to record the
+  analysis against.
+- `--migration-manifest <PATH>`: an author-supplied migration manifest
+  (JSON), treated as a declaration, not proof.
+- `--rehearsal <PATH>`: a rehearsal input file (JSON) describing
+  invocations to run against both executables under the real
+  `soroban-env-host` backend.
+- `--format <json|terminal>`: output format; `terminal` (the default)
+  prints a human-readable report, `json` prints the canonical report
+  (see `schemas/analysis-result.schema.json`).
+
+Exit codes: `0` means the analysis pipeline completed, regardless of the
+report's own `status` field (which may be `NO_DETECTED_BLOCKERS`,
+`REVIEW_REQUIRED`, `MIGRATION_REQUIRED`, or `INCONCLUSIVE`); a non-zero
+code means the CLI itself could not complete (invalid input, a missing
+or unreadable file, or an internal analysis failure). Run
+`sorobanlabs-analyzer --help` for the full table.
 
 ## Development setup
 
