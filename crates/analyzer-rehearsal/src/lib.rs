@@ -28,6 +28,7 @@
 //! comparing the two sides' observations into a behavioral diff, are
 //! later steps.
 
+pub mod diff;
 pub mod host;
 pub mod input;
 pub mod observation;
@@ -40,3 +41,4 @@ pub use observation::{
     StateAccessObservation,
 };
 pub use trace::RehearsalTrace;
+pub use diff::{BehavioralDiff, Difference, diff_invocations};

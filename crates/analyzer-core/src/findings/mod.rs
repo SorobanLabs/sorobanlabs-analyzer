@@ -161,6 +161,10 @@ pub enum Rule {
     RehearsalStateChanged,
     RehearsalEventChanged,
     RehearsalFailed,
+    RehearsalErrorChanged,
+    RehearsalAuthorizationChanged,
+    RehearsalResourceChanged,
+    RehearsalObservationIncomplete,
     ResourceUsageChanged,
 }
 
@@ -187,6 +191,10 @@ impl Rule {
             Self::RehearsalStateChanged => "REHEARSAL_STATE_CHANGED",
             Self::RehearsalEventChanged => "REHEARSAL_EVENT_CHANGED",
             Self::RehearsalFailed => "REHEARSAL_FAILED",
+            Self::RehearsalErrorChanged => "REHEARSAL_ERROR_CHANGED",
+            Self::RehearsalAuthorizationChanged => "REHEARSAL_AUTHORIZATION_CHANGED",
+            Self::RehearsalResourceChanged => "REHEARSAL_RESOURCE_CHANGED",
+            Self::RehearsalObservationIncomplete => "REHEARSAL_OBSERVATION_INCOMPLETE",
             Self::ResourceUsageChanged => "RESOURCE_USAGE_CHANGED",
         }
     }
