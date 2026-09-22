@@ -14,7 +14,9 @@ mod json;
 mod schema;
 mod terminal;
 
-pub use canonical::{AnalysisReport, ReportExecutableIdentity, ReportFinding, ReportRehearsal};
+pub use canonical::{
+    AnalysisReport, ReportEvidence, ReportExecutableIdentity, ReportFinding, ReportRehearsal,
+};
 pub use json::{from_canonical_json, to_canonical_json};
 pub use schema::REPORT_SCHEMA_VERSION;
 pub use terminal::render_terminal;
