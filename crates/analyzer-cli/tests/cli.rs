@@ -47,12 +47,24 @@ fn add_invocation(label: &str, a: i32, b: i32) -> RehearsalInvocation {
 }
 
 fn write_rehearsal_input(dir: &std::path::Path, invocations: Vec<RehearsalInvocation>) -> PathBuf {
-    // current_executable/candidate_executable are ignored by the
-    // pipeline (it rehearses the bytes loaded from --current/--candidate
-    // instead, see orchestration.rs), so they are left empty here.
+    write_rehearsal_input_with_embedded_bytes(dir, invocations, vec![], vec![])
+}
+
+/// Like [`write_rehearsal_input`], but lets the caller control the
+/// embedded `current_executable`/`candidate_executable` bytes, so tests
+/// can prove those fields are not consumed by the pipeline (it
+/// rehearses the bytes loaded from `--current`/`--candidate` instead;
+/// see `analyzer_rehearsal::input`'s module docs and
+/// `orchestration.rs`).
+fn write_rehearsal_input_with_embedded_bytes(
+    dir: &std::path::Path,
+    invocations: Vec<RehearsalInvocation>,
+    current_executable: Vec<u8>,
+    candidate_executable: Vec<u8>,
+) -> PathBuf {
     let input = RehearsalInput {
-        current_executable: vec![],
-        candidate_executable: vec![],
+        current_executable,
+        candidate_executable,
         state_snapshot: None,
         invocations,
         protocol_context: Some(28),
@@ -285,6 +297,46 @@ fn valid_rehearsal_input_reaches_the_real_soroban_host_backend() {
         .unwrap()
         .iter()
         .any(|f| f["rule"] == "REHEARSAL_RESULT_CHANGED"));
+}
+
+#[test]
+fn embedded_rehearsal_executable_bytes_are_not_consumed_by_the_pipeline() {
+    // RehearsalInput.current_executable/candidate_executable are
+    // documented as not consumed by this orchestration (it rehearses
+    // the --current/--candidate bytes it already loaded instead). Prove
+    // that honestly: garbage bytes in those fields must not change the
+    // rehearsal outcome versus leaving them empty.
+    let dir = tempfile::tempdir().unwrap();
+    let rehearsal_path = write_rehearsal_input_with_embedded_bytes(
+        dir.path(),
+        vec![add_invocation("add(2,3)", 2, 3)],
+        b"not a real wasm module at all".to_vec(),
+        b"also not a real wasm module".to_vec(),
+    );
+
+    let output = bin()
+        .args(["analyze", "--current"])
+        .arg(fixture("v1.wasm"))
+        .args(["--candidate"])
+        .arg(fixture("v2_identical.wasm"))
+        .args(["--rehearsal"])
+        .arg(&rehearsal_path)
+        .args(["--format", "json"])
+        .output()
+        .expect("failed to run binary");
+
+    assert_eq!(output.status.code(), Some(0));
+    let value: serde_json::Value = serde_json::from_str(&stdout_of(&output)).unwrap();
+    let rehearsal = &value["rehearsal"];
+    // If the garbage bytes had been used, the host would have blocked
+    // the invocation instead of running it successfully.
+    assert_eq!(rehearsal["ran"], true);
+    assert_eq!(rehearsal["backend_used"], "soroban-env-host");
+    assert!(!value["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|f| f["rule"] == "REHEARSAL_FAILED" && f["severity"] == "HIGH"));
 }
 
 #[test]
