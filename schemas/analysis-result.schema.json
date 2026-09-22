@@ -49,12 +49,62 @@
       "description": "Controlled rehearsal evidence, or null when the report predates rehearsal reporting. Present (possibly with requested=false) on every report produced by a pipeline that supports rehearsal, whether or not a rehearsal manifest was supplied.",
       "oneOf": [{ "$ref": "#/$defs/rehearsal" }, { "type": "null" }]
     },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidenceRecord" },
+      "description": "Every evidence record any finding below references (by id), in encounter order. A finding's evidence entries are ids into this list."
+    },
     "findings": {
       "type": "array",
       "items": { "$ref": "#/$defs/finding" }
     }
   },
   "$defs": {
+    "evidenceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "producer", "location", "observation"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Deterministic SHA-256 over (source, producer, location, observation); a finding's evidence array references records here by this id."
+        },
+        "source": {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "local_artifact",
+                "custom_wasm_section",
+                "xdr_decoded_value",
+                "rpc_response",
+                "ledger_entry",
+                "execution_trace",
+                "rule_evaluation",
+                "migration_manifest",
+                "derived_comparison"
+              ]
+            }
+          },
+          "description": "What kind of thing this evidence was examined from, plus kind-specific identifying fields (for example artifact_hash, section_name, endpoint)."
+        },
+        "producer": {
+          "type": "string",
+          "description": "What parser, comparison, or rule produced this observation."
+        },
+        "location": {
+          "type": ["string", "null"],
+          "description": "What location inside the source matters, if applicable."
+        },
+        "observation": {
+          "type": "string",
+          "description": "The bounded, human-readable fact or conclusion this evidence establishes."
+        }
+      }
+    },
     "rehearsal": {
       "type": "object",
       "additionalProperties": false,

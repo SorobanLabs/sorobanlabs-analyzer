@@ -53,6 +53,7 @@ fn sample_report() -> AnalysisReport {
         AnalysisStatus::ReviewRequired,
         std::slice::from_ref(&finding),
         None,
+        &[],
     )
 }
 

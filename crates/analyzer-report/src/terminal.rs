@@ -166,6 +166,7 @@ mod tests {
                 behavioral_differences_established: vec![],
                 remains_unverified: vec!["events".to_string()],
             }),
+            &[],
         )
     }
 

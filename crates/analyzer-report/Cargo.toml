@@ -9,6 +9,7 @@ description = "Canonical JSON, Markdown, and terminal report rendering for the S
 
 [dependencies]
 analyzer-core.workspace = true
+analyzer-evidence.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
