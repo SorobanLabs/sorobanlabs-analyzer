@@ -4,8 +4,9 @@
 //! and "what the analyzer does with it": every later analysis stage
 //! only ever sees a [`crate::snapshot::StateSnapshot`], never a
 //! source-specific type. [`LocalSnapshotSource`] reads a snapshot
-//! already captured to a local JSON file. A read-only RPC source is
-//! added in a later step without changing this trait.
+//! already captured to a local JSON file. [`crate::rpc::RpcStateSource`]
+//! is the read-only RPC source, added without changing this trait; see
+//! that module's docs for its current scope.
 
 use std::path::{Path, PathBuf};
 

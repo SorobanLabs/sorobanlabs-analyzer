@@ -11,9 +11,12 @@
 //!   and exposed on every [`LoadedWasm`] as [`LoadedWasm::soroban_structural`].
 //!
 //! Neither level determines whether the module is a *supported Soroban
-//! executable* (Level 2, environment/contract metadata) or a
-//! semantically analyzable contract (Level 3). Those distinctions
-//! belong to later steps.
+//! executable* (Level 2, environment/contract metadata, established by
+//! [`crate::environment_meta`] and [`crate::contract_meta`]) or has a
+//! parseable contract specification (Level 3, established by
+//! [`crate::contract_spec`] and [`crate::interface`]). This analyzer
+//! does not attempt a further level of semantic understanding (what
+//! the contract's code actually does beyond its declared interface).
 //!
 //! # Identity
 //!

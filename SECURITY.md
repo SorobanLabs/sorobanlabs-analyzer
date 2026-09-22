@@ -5,12 +5,25 @@
 SorobanLabs Analyzer treats all supplied WASM executables and state data
 as untrusted input. The analyzer:
 
-- Does not perform arbitrary host execution of analyzed WASM.
+- Does not perform arbitrary, unbounded host execution of analyzed WASM.
+  This is a distinction, not a denial: when a rehearsal manifest is
+  supplied (`analyze --rehearsal`), the candidate and current
+  executables ARE actually run, invocation by invocation. That
+  execution is bounded and controlled: it goes only through the
+  project-selected `soroban-env-host` backend (`analyzer-rehearsal`),
+  runs inside that backend's own panic-catching wrapper, is subject to
+  a caller-configurable (and otherwise analyzer-defaulted) CPU/memory
+  budget, and never touches real network state. A panic or trap inside
+  the candidate is caught and reported as an observation
+  (`Blocked`/`Trap`/`HostError`), not propagated as a crash of this
+  process.
 - Rejects malformed artifacts safely, with structured errors, rather
-  than panicking or producing undefined behavior.
+  than panicking or producing undefined behavior, outside of the
+  controlled rehearsal path described above.
 - Performs no uncontrolled filesystem writes.
-- Never automatically submits a transaction or mutates network state.
-  Any Stellar RPC backend used by the analyzer is read-only.
+- Never automatically submits a transaction or mutates network state,
+  including during rehearsal. Any Stellar RPC backend used by the
+  analyzer is read-only.
 - Does not request, accept, or handle private keys. No workflow in this
   project requires a private key.
 - Avoids logging sensitive configuration values.

@@ -21,7 +21,11 @@ an explicit confidence level.
 - Represents known contract state and compares state requirements
   between the current and candidate executables.
 - Extracts and compares the authorization surface (entrypoint,
-  authorization requirement, principal, check).
+  authorization requirement, principal, check). This is limited to
+  *direct* calls to Soroban's authorization primitives from an
+  entrypoint's own function body; it does not trace calls through
+  helper functions, so "no direct call observed" is not the same
+  finding as "this entrypoint is unprotected".
 - When given a rehearsal manifest, runs the same invocations against both
   executables under a real, bounded Soroban host backend and reports
   observed behavioral differences (return value, execution outcome).
@@ -72,14 +76,20 @@ Top-level analysis status is one of:
 
 ```
 crates/
-  analyzer-core        domain model and orchestration
+  analyzer-core        domain model: errors, findings, confidence,
+                       severity, status, upgrade plan
   analyzer-executable   executable loading, WASM inspection, interface diff
   analyzer-state        state snapshots and compatibility analysis
   analyzer-auth         authorization surface extraction and diff
   analyzer-rehearsal    controlled upgrade rehearsal (Soroban host backend)
   analyzer-evidence     evidence model backing findings
   analyzer-report       JSON report and terminal report rendering
-  analyzer-cli          command-line interface
+  analyzer-cli          command-line interface AND the concrete
+                       pipeline orchestration (sequencing calls into
+                       the crates above); it lives here, not in
+                       analyzer-core, to avoid a dependency cycle,
+                       since analyzer-executable/-state/-auth/-report
+                       all depend on analyzer-core
 fixtures/    declarative fixtures used by the test suite
 schemas/     versioned JSON schemas for canonical output
 examples/    example inputs and outputs
