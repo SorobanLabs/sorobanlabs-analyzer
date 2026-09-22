@@ -1,0 +1,1 @@
+/home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/wasm32v1-none/release/v2_changed_error.wasm: /home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/v2_changed_error/src/lib.rs

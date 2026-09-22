@@ -1,0 +1,10 @@
+/home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/release/deps/soroban_spec_rust-6b765183acc50f14.d: /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/lib.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/syn_ext.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/trait.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/types.rs
+
+/home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/release/deps/libsoroban_spec_rust-6b765183acc50f14.rlib: /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/lib.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/syn_ext.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/trait.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/types.rs
+
+/home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/release/deps/libsoroban_spec_rust-6b765183acc50f14.rmeta: /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/lib.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/syn_ext.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/trait.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/types.rs
+
+/home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/lib.rs:
+/home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/syn_ext.rs:
+/home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/trait.rs:
+/home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/soroban-spec-rust-28.0.0/src/types.rs:

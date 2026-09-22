@@ -1,0 +1,1 @@
+/home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/wasm32v1-none/release/v2_identical.wasm: /home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/v2_identical/src/lib.rs

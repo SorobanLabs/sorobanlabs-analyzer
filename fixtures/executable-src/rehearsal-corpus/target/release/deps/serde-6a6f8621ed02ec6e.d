@@ -1,0 +1,14 @@
+/home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/release/deps/serde-6a6f8621ed02ec6e.d: /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/release/build/serde-975d4a3cbc67c4cc/out/private.rs
+
+/home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/release/deps/libserde-6a6f8621ed02ec6e.rlib: /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/release/build/serde-975d4a3cbc67c4cc/out/private.rs
+
+/home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/release/deps/libserde-6a6f8621ed02ec6e.rmeta: /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/release/build/serde-975d4a3cbc67c4cc/out/private.rs
+
+/home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs:
+/home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs:
+/home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs:
+/home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:
+/home/gamp/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs:
+/home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/release/build/serde-975d4a3cbc67c4cc/out/private.rs:
+
+# env-dep:OUT_DIR=/home/gamp/sorobanlabs-analyzer/fixtures/executable-src/rehearsal-corpus/target/release/build/serde-975d4a3cbc67c4cc/out
