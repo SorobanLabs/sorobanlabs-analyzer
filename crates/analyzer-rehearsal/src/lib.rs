@@ -34,6 +34,7 @@ pub mod input;
 pub mod observation;
 pub mod trace;
 
+pub use diff::{diff_invocations, BehavioralDiff, Difference};
 pub use host::rehearse_invocation;
 pub use input::{ExecutionLimits, RehearsalInput, RehearsalInvocation};
 pub use observation::{
@@ -41,4 +42,3 @@ pub use observation::{
     StateAccessObservation,
 };
 pub use trace::RehearsalTrace;
-pub use diff::{BehavioralDiff, Difference, diff_invocations};
