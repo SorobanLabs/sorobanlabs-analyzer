@@ -85,22 +85,39 @@ pub fn run_analyze(args: &AnalyzeArgs, stdout: &mut dyn Write, stderr: &mut dyn 
         Err(err) => return report_error(stderr, &err),
     };
 
-    match args.format {
+    let rendered = match args.format {
         OutputFormat::Json => match to_canonical_json(&report) {
-            Ok(json) => {
-                let _ = write!(stdout, "{json}");
-                exit_code::SUCCESS
-            }
-            Err(err) => report_error(stderr, &err),
+            Ok(json) => json,
+            Err(err) => return report_error(stderr, &err),
         },
-        OutputFormat::Terminal => {
-            let _ = write!(stdout, "{}", render_terminal(&report));
-            exit_code::SUCCESS
+        OutputFormat::Terminal => render_terminal(&report),
+    };
+
+    write_report(stdout, stderr, &rendered)
+}
+
+/// Write `rendered` to `stdout`. A completed analysis whose report
+/// could not actually be delivered to the caller (a broken pipe, a full
+/// disk) must not report success: this is still an operational
+/// failure, distinct from the analysis itself, so it is reported to
+/// `stderr` and mapped through the same backend-failure exit code as
+/// any other output-side I/O problem.
+fn write_report(stdout: &mut dyn Write, stderr: &mut dyn Write, rendered: &str) -> i32 {
+    match write!(stdout, "{rendered}") {
+        Ok(()) => exit_code::SUCCESS,
+        Err(source) => {
+            let err: AnalyzerError =
+                BackendError::with_source("failed to write the report to stdout", source).into();
+            report_error(stderr, &err)
         }
     }
 }
 
 fn report_error(stderr: &mut dyn Write, err: &AnalyzerError) -> i32 {
+    // stderr itself may also fail to accept the message (for example, a
+    // broken pipe on a redirected stderr); there is nothing further this
+    // CLI can do about that beyond not panicking, so the write result is
+    // deliberately not propagated a second time here.
     let _ = writeln!(stderr, "error: {err}");
     exit_code_for(err)
 }
@@ -252,5 +269,36 @@ mod tests {
         assert_eq!(code, exit_code::INVALID_INPUT);
         let message = String::from_utf8(err).unwrap();
         assert!(message.contains("failed to parse rehearsal input"));
+    }
+
+    /// A `Write` that always fails, simulating a broken pipe or a full
+    /// disk on stdout.
+    struct FailingWriter;
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "pipe closed",
+            ))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_completed_analysis_that_cannot_be_written_to_stdout_is_not_reported_as_success() {
+        let mut out = FailingWriter;
+        let mut err = Vec::new();
+        let a = args(
+            fixture("v1.wasm"),
+            fixture("v2_identical.wasm"),
+            OutputFormat::Json,
+        );
+        let code = run_analyze(&a, &mut out, &mut err);
+        assert_eq!(code, exit_code::BACKEND_FAILURE);
+        let message = String::from_utf8(err).unwrap();
+        assert!(message.contains("failed to write the report to stdout"));
     }
 }
