@@ -80,6 +80,7 @@ pub struct AnalysisReport {
     pub current_executable: ReportExecutableIdentity,
     pub candidate_executable: ReportExecutableIdentity,
     pub status: String,
+    pub rehearsal: Option<ReportRehearsal>,
     pub findings: Vec<ReportFinding>,
 }
 
@@ -95,6 +96,7 @@ impl AnalysisReport {
         candidate_executable: ReportExecutableIdentity,
         status: AnalysisStatus,
         findings: &[Finding],
+        rehearsal: Option<ReportRehearsal>,
     ) -> Self {
         Self {
             schema_version: REPORT_SCHEMA_VERSION.to_string(),
@@ -103,6 +105,7 @@ impl AnalysisReport {
             current_executable,
             candidate_executable,
             status: status.to_string(),
+            rehearsal,
             findings: findings.iter().map(ReportFinding::from_finding).collect(),
         }
     }
@@ -129,6 +132,7 @@ mod tests {
             },
             AnalysisStatus::NoDetectedBlockers,
             &[],
+            None,
         );
         assert_eq!(report.schema_version, REPORT_SCHEMA_VERSION);
     }
@@ -159,4 +163,15 @@ mod tests {
             Some("review the diff".to_string())
         );
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReportRehearsal {
+    pub requested: bool,
+    pub ran: bool,
+    pub backend_used: Option<String>,
+    pub observations_captured: Vec<String>,
+    pub observations_unavailable: Vec<String>,
+    pub behavioral_differences_established: Vec<String>,
+    pub remains_unverified: Vec<String>,
 }

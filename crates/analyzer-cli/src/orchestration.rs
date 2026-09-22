@@ -3,10 +3,15 @@
 //! This module sequences calls into the underlying analysis crates in
 //! the order: identity -> validation -> environment metadata ->
 //! contract specification -> interface diff -> state compatibility ->
-//! authorization comparison -> finding synthesis -> canonical report.
-//! Rehearsal is not implemented yet (a later step); its absence is
-//! surfaced as an explicit limitation, not silently skipped and not an
-//! exception.
+//! authorization comparison -> finding synthesis -> rehearsal ->
+//! canonical report.
+//!
+//! Rehearsal only runs when the caller supplies
+//! [`AnalysisRequest::rehearsal_input`]; the pipeline never invokes the
+//! `analyzer-rehearsal` backend on its own. When rehearsal input is
+//! absent, that absence is surfaced as an explicit
+//! `REHEARSAL_FAILED` finding at [`Confidence::NotDeterminable`], not
+//! silently skipped.
 //!
 //! # Why this lives in `analyzer-cli`, not `analyzer-core`
 //!
@@ -65,6 +70,7 @@ pub struct AnalysisRequest<'a> {
     pub migration_manifest: Option<&'a MigrationManifest>,
     /// The analyzer's own version string, recorded in the report.
     pub analyzer_version: &'a str,
+    pub rehearsal_input: Option<&'a analyzer_rehearsal::RehearsalInput>,
 }
 
 /// Run the full upgrade analysis pipeline and produce a canonical
@@ -96,21 +102,133 @@ pub fn run_upgrade_analysis(request: &AnalysisRequest) -> Result<AnalysisReport,
         &mut findings,
     );
     synthesize_authorization_findings(&current, &candidate, &mut findings)?;
+    let report_rehearsal = if let Some(rehearsal) = request.rehearsal_input {
+        let mut ran = true;
+        let mut diffs = Vec::new();
 
-    // Rehearsal is not implemented yet. Surface that explicitly rather
-    // than silently omitting any behavioral comparison.
-    findings.push(Finding::new(
-        FindingCategory::Rehearsal,
-        Rule::RehearsalFailed,
-        "rehearsal",
-        "controlled rehearsal was not performed",
-        "This analyzer does not yet implement controlled upgrade rehearsal (behavioral comparison \
-         under representative state). No observation about runtime behavior differences between \
-         the current and candidate executables was made.",
-        Severity::Info,
-        Confidence::NotDeterminable,
-        vec![],
-    ));
+        for invocation in &rehearsal.invocations {
+            let current_obs = analyzer_rehearsal::rehearse_invocation(
+                current.bytes(),
+                invocation,
+                &rehearsal.execution_limits,
+            );
+
+            let candidate_obs = analyzer_rehearsal::rehearse_invocation(
+                candidate.bytes(),
+                invocation,
+                &rehearsal.execution_limits,
+            );
+
+            if matches!(
+                candidate_obs.outcome,
+                analyzer_rehearsal::ExecutionOutcome::Blocked { .. }
+            ) {
+                ran = false;
+                findings.push(Finding::new(
+                    FindingCategory::Rehearsal,
+                    Rule::RehearsalFailed,
+                    &invocation.label,
+                    "candidate execution was blocked by the host",
+                    "the rehearsal backend could not execute the candidate safely or meaningfully",
+                    Severity::High,
+                    Confidence::Detected,
+                    vec![],
+                ));
+            } else if matches!(
+                current_obs.outcome,
+                analyzer_rehearsal::ExecutionOutcome::Blocked { .. }
+            ) {
+                ran = false;
+                findings.push(Finding::new(
+                    FindingCategory::Rehearsal,
+                    Rule::RehearsalFailed,
+                    &invocation.label,
+                    "current execution was blocked by the host",
+                    "the rehearsal backend could not execute the current executable safely or meaningfully",
+                    Severity::High,
+                    Confidence::Detected,
+                    vec![],
+                ));
+            } else {
+                let diff = analyzer_rehearsal::diff::diff_invocations(&current_obs, &candidate_obs);
+
+                if matches!(diff.outcome, analyzer_rehearsal::Difference::Changed { .. }) {
+                    findings.push(Finding::new(
+                        FindingCategory::Rehearsal,
+                        Rule::RehearsalResultChanged,
+                        &invocation.label,
+                        "invocation execution outcome changed",
+                        "the candidate returned a different outcome type (e.g. Success vs Trap) than the current executable",
+                        Severity::High,
+                        Confidence::Detected,
+                        vec![],
+                    ));
+                    diffs.push("outcome".to_string());
+                }
+
+                if matches!(
+                    diff.return_value,
+                    analyzer_rehearsal::Difference::Changed { .. }
+                ) {
+                    findings.push(Finding::new(
+                        FindingCategory::Rehearsal,
+                        Rule::RehearsalResultChanged,
+                        &invocation.label,
+                        "invocation return value changed",
+                        "the candidate returned a different value than the current executable",
+                        Severity::High,
+                        Confidence::Detected,
+                        vec![],
+                    ));
+                    diffs.push("return_value".to_string());
+                }
+            }
+        }
+
+        let obs_unavail = vec![
+            "events".to_string(),
+            "state_reads".to_string(),
+            "state_writes".to_string(),
+            "resource_usage".to_string(),
+        ];
+
+        Some(analyzer_report::ReportRehearsal {
+            requested: true,
+            ran,
+            backend_used: Some("soroban-env-host".to_string()),
+            observations_captured: vec!["outcome".to_string(), "return_value".to_string()],
+            observations_unavailable: obs_unavail,
+            behavioral_differences_established: diffs,
+            remains_unverified: vec![
+                "events".to_string(),
+                "state".to_string(),
+                "authorization".to_string(),
+            ],
+        })
+    } else {
+        findings.push(Finding::new(
+            FindingCategory::Rehearsal,
+            Rule::RehearsalFailed,
+            "rehearsal",
+            "controlled rehearsal was not requested",
+            "the analysis pipeline was run without a rehearsal manifest; \
+             no observation about runtime behaviour differences between \
+             the current and candidate executables was made",
+            Severity::Info,
+            Confidence::NotDeterminable,
+            vec![],
+        ));
+
+        Some(analyzer_report::ReportRehearsal {
+            requested: false,
+            ran: false,
+            backend_used: None,
+            observations_captured: vec![],
+            observations_unavailable: vec![],
+            behavioral_differences_established: vec![],
+            remains_unverified: vec!["all execution behavior".to_string()],
+        })
+    };
 
     let status = overall_status(&findings);
 
@@ -127,6 +245,7 @@ pub fn run_upgrade_analysis(request: &AnalysisRequest) -> Result<AnalysisReport,
         },
         status,
         &findings,
+        report_rehearsal,
     ))
 }
 
@@ -618,6 +737,7 @@ mod tests {
             protocol_context: Some(28),
             migration_manifest: None,
             analyzer_version: "0.1.0",
+            rehearsal_input: None,
         };
 
         let report = run_upgrade_analysis(&request).unwrap();
@@ -647,6 +767,7 @@ mod tests {
             protocol_context: None,
             migration_manifest: None,
             analyzer_version: "0.1.0",
+            rehearsal_input: None,
         };
         let result = run_upgrade_analysis(&request);
         assert!(matches!(result, Err(AnalyzerError::Backend(_))));
@@ -667,6 +788,7 @@ mod tests {
             protocol_context: None,
             migration_manifest: None,
             analyzer_version: "0.1.0",
+            rehearsal_input: None,
         };
 
         let report = run_upgrade_analysis(&request).unwrap();

@@ -21,6 +21,7 @@ analyzer-core.workspace = true
 analyzer-executable.workspace = true
 analyzer-state.workspace = true
 analyzer-auth.workspace = true
+analyzer-rehearsal.workspace = true
 analyzer-evidence.workspace = true
 analyzer-report.workspace = true
 clap.workspace = true
@@ -30,6 +31,8 @@ clap.workspace = true
 # on the 1.84.0 MSRV; newer tempfile releases pull in getrandom 0.4,
 # which requires edition2024.
 tempfile = "=3.14.0"
+hex.workspace = true
+soroban-env-host.workspace = true
 
 [lints]
 workspace = true

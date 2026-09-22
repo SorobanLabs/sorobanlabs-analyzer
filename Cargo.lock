@@ -45,9 +45,12 @@ dependencies = [
  "analyzer-core",
  "analyzer-evidence",
  "analyzer-executable",
+ "analyzer-rehearsal",
  "analyzer-report",
  "analyzer-state",
  "clap",
+ "hex",
+ "soroban-env-host",
  "tempfile",
 ]
 
@@ -91,6 +94,7 @@ dependencies = [
 name = "analyzer-rehearsal"
 version = "0.1.0"
 dependencies = [
+ "analyzer-executable",
  "analyzer-state",
  "hex",
  "serde",

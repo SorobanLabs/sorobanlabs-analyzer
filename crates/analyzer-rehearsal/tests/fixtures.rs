@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use analyzer_executable::LoadedWasm;
 use std::path::PathBuf;
 
@@ -28,8 +30,36 @@ fn test_rehearsal_corpus_loads() {
     for fixture in fixtures {
         let exec = load_fixture(fixture);
         // Minimal assertions to prove it loaded and validated
-        assert!(exec.bytes().len() > 0);
+        assert!(!exec.bytes().is_empty());
         // It has a valid hash
         assert_eq!(exec.hash().to_string().len(), 64);
     }
+}
+
+#[test]
+fn v2_fails_is_blocked_or_host_error() {
+    use analyzer_rehearsal::{
+        rehearse_invocation, ExecutionLimits, ExecutionOutcome, RehearsalInvocation,
+    };
+    use soroban_env_host::xdr::{Limits, ScVal, WriteXdr};
+
+    let wasm = std::fs::read(fixture_path("v2_fails.wasm")).unwrap();
+    let invocation = RehearsalInvocation {
+        label: "probe".to_string(),
+        function_name: "add".to_string(),
+        arguments_xdr_hex: vec![
+            hex::encode(ScVal::I32(1).to_xdr(Limits::none()).unwrap()),
+            hex::encode(ScVal::I32(2).to_xdr(Limits::none()).unwrap()),
+        ],
+    };
+    let obs = rehearse_invocation(&wasm, &invocation, &ExecutionLimits::default());
+    eprintln!("v2_fails outcome: {:?}", obs.outcome);
+    assert!(
+        matches!(
+            obs.outcome,
+            ExecutionOutcome::Blocked { .. } | ExecutionOutcome::HostError { .. }
+        ),
+        "expected Blocked or HostError, got {:?}",
+        obs.outcome
+    );
 }
