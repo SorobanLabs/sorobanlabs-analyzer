@@ -133,6 +133,23 @@ fn nonexistent_candidate_executable_exits_with_backend_failure() {
     assert!(stderr_of(&output).contains("failed to read artifact"));
 }
 
+#[test]
+fn malformed_wasm_candidate_exits_with_invalid_input_not_backend_failure() {
+    // The file exists and is readable (exit 3 territory); its content
+    // is simply not a WASM module, which is an invalid-input problem
+    // (exit 2), distinct from "could not read the file at all".
+    let output = bin()
+        .args(["analyze", "--current"])
+        .arg(fixture("v1.wasm"))
+        .args(["--candidate"])
+        .arg(fixture("invalid.wasm"))
+        .output()
+        .expect("failed to run binary");
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(stdout_of(&output).is_empty());
+}
+
 // ── valid analysis, both output formats ─────────────────────────────
 
 #[test]

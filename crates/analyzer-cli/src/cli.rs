@@ -28,12 +28,14 @@ EXIT CODES
 field (NO_DETECTED_BLOCKERS, REVIEW_REQUIRED, MIGRATION_REQUIRED, or \
 INCONCLUSIVE) carries the analytical outcome; none of those statuses is \
 itself treated as a CLI failure.
-  2  invalid input: bad command-line arguments, a missing or unreadable \
-executable, an executable that is not valid WASM, a malformed migration \
-manifest, a malformed rehearsal input file, or a report serialization \
-failure.
-  3  a required input file could not be read (missing file, permission \
-denied, or the path names a directory).
+  2  invalid input: bad command-line arguments, an empty executable \
+path, an executable whose bytes are not valid WASM, a malformed \
+migration manifest, a malformed rehearsal input file, or a report \
+serialization failure. This is about the CONTENT of what was supplied.
+  3  a required input file (executable, migration manifest, or \
+rehearsal input) could not be read: missing file, permission denied, \
+or the path names a directory. This is about being unable to READ \
+what was supplied, before its content is even examined.
   5  an internal analysis-stage failure (the artifact loaded but an \
 analysis operation itself could not complete).";
 
