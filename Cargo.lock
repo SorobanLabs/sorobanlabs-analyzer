@@ -91,6 +91,7 @@ dependencies = [
 name = "analyzer-rehearsal"
 version = "0.1.0"
 dependencies = [
+ "analyzer-executable",
  "analyzer-state",
  "hex",
  "serde",
