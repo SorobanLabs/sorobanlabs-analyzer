@@ -12,7 +12,10 @@ fn fixture_path(name: &str) -> PathBuf {
 
 fn load_fixture(name: &str) -> LoadedWasm {
     let path = fixture_path(name);
-    LoadedWasm::from_path(&path).expect("failed to load fixture")
+    match LoadedWasm::from_path(&path) {
+        Ok(exec) => exec,
+        Err(err) => panic!("failed to load fixture {}: {err}", path.display()),
+    }
 }
 
 #[test]
