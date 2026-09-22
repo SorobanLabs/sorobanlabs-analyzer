@@ -25,6 +25,7 @@ analyzer-rehearsal.workspace = true
 analyzer-evidence.workspace = true
 analyzer-report.workspace = true
 clap.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 # Pinned transitively via proptest/rusty-fork to keep the resolved graph
