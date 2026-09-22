@@ -1,4 +1,7 @@
-use crate::observation::{EventObservation, ExecutionOutcome, InvocationObservation, ResourceUsage, StateAccessObservation};
+use crate::observation::{
+    EventObservation, ExecutionOutcome, InvocationObservation, ResourceUsage,
+    StateAccessObservation,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -20,17 +23,26 @@ pub struct BehavioralDiff {
     pub resource_usage: Difference<ResourceUsage>,
 }
 
-pub fn diff_invocations(old: &InvocationObservation, new: &InvocationObservation) -> BehavioralDiff {
+pub fn diff_invocations(
+    old: &InvocationObservation,
+    new: &InvocationObservation,
+) -> BehavioralDiff {
     let outcome = if old.outcome == new.outcome {
         Difference::Unchanged
     } else {
-        Difference::Changed { old: old.outcome.clone(), new: new.outcome.clone() }
+        Difference::Changed {
+            old: old.outcome.clone(),
+            new: new.outcome.clone(),
+        }
     };
 
     let return_value = if old.return_value_xdr_hex == new.return_value_xdr_hex {
         Difference::Unchanged
     } else {
-        Difference::Changed { old: old.return_value_xdr_hex.clone(), new: new.return_value_xdr_hex.clone() }
+        Difference::Changed {
+            old: old.return_value_xdr_hex.clone(),
+            new: new.return_value_xdr_hex.clone(),
+        }
     };
 
     // The current execution backend does not capture events or state.
@@ -41,8 +53,14 @@ pub fn diff_invocations(old: &InvocationObservation, new: &InvocationObservation
 
     let resource_usage = match (old.resource_usage, new.resource_usage) {
         (
-            ResourceUsage { instructions_consumed: None, memory_bytes_consumed: None },
-            ResourceUsage { instructions_consumed: None, memory_bytes_consumed: None }
+            ResourceUsage {
+                instructions_consumed: None,
+                memory_bytes_consumed: None,
+            },
+            ResourceUsage {
+                instructions_consumed: None,
+                memory_bytes_consumed: None,
+            },
         ) => Difference::NotObservable,
         (o, n) if o == n => Difference::Unchanged,
         (o, n) => Difference::Changed { old: o, new: n },
@@ -64,7 +82,10 @@ pub fn diff_invocations(old: &InvocationObservation, new: &InvocationObservation
 mod tests {
     use super::*;
 
-    fn dummy_observation(outcome: ExecutionOutcome, return_val: Option<&str>) -> InvocationObservation {
+    fn dummy_observation(
+        outcome: ExecutionOutcome,
+        return_val: Option<&str>,
+    ) -> InvocationObservation {
         InvocationObservation {
             invocation_label: "test".to_string(),
             outcome,
@@ -99,8 +120,18 @@ mod tests {
 
     #[test]
     fn changed_error() {
-        let old = dummy_observation(ExecutionOutcome::HostError { message: "err1".to_string() }, None);
-        let new = dummy_observation(ExecutionOutcome::HostError { message: "err2".to_string() }, None);
+        let old = dummy_observation(
+            ExecutionOutcome::HostError {
+                message: "err1".to_string(),
+            },
+            None,
+        );
+        let new = dummy_observation(
+            ExecutionOutcome::HostError {
+                message: "err2".to_string(),
+            },
+            None,
+        );
         let diff = diff_invocations(&old, &new);
 
         assert!(matches!(diff.outcome, Difference::Changed { .. }));
@@ -110,7 +141,12 @@ mod tests {
     #[test]
     fn candidate_execution_failure() {
         let old = dummy_observation(ExecutionOutcome::Success, Some("00"));
-        let new = dummy_observation(ExecutionOutcome::Trap { message: "panic".to_string() }, None);
+        let new = dummy_observation(
+            ExecutionOutcome::Trap {
+                message: "panic".to_string(),
+            },
+            None,
+        );
         let diff = diff_invocations(&old, &new);
 
         assert!(matches!(diff.outcome, Difference::Changed { .. }));
