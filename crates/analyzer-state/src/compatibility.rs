@@ -150,9 +150,15 @@ pub fn assess_state_compatibility(
                     "no migration manifest was supplied, and this analyzer does not reconstruct a contract's storage layout from raw WASM; static storage-access compatibility cannot be established from this evidence alone".to_string(),
                 )
             } else {
+                // A manifest that declares neither a migration function
+                // nor a schema change is silence, not a positive
+                // compatibility claim: the manifest is author-supplied
+                // and UNVERIFIED (see MigrationManifest::to_evidence).
+                // "the author did not describe a migration" must not be
+                // read as "the analyzer established compatibility".
                 result(
-                    StateCompatibility::Compatible,
-                    "migration manifest was supplied and declares neither a migration function nor a schema change; no incompatible state condition was established".to_string(),
+                    StateCompatibility::NotDetermined,
+                    "the executable changed and a migration manifest was supplied, but it declares neither a migration function nor a schema change; this is an unverified author declaration of silence, not analyzer-established evidence of compatibility, so compatibility still cannot be established from this evidence alone".to_string(),
                 )
             }
         }
@@ -212,9 +218,21 @@ mod tests {
     }
 
     #[test]
-    fn manifest_present_but_declares_no_migration_is_compatible() {
+    fn changed_hash_with_empty_manifest_is_not_determined_not_compatible() {
+        // A manifest that declares nothing is an unverified author
+        // declaration of silence, not proof of compatibility.
         let manifest = MigrationManifest::default();
         let result = assess_state_compatibility(&wasm("aa"), &wasm("bb"), Some(&manifest));
+        assert_eq!(result.outcome, StateCompatibility::NotDetermined);
+        assert!(result.reasons[0].contains("unverified author declaration"));
+    }
+
+    #[test]
+    fn identical_hash_with_empty_manifest_is_still_compatible() {
+        // No executable change at all; the manifest's silence is moot
+        // because there is nothing for it to have declared about.
+        let manifest = MigrationManifest::default();
+        let result = assess_state_compatibility(&wasm("aa"), &wasm("aa"), Some(&manifest));
         assert_eq!(result.outcome, StateCompatibility::Compatible);
     }
 
