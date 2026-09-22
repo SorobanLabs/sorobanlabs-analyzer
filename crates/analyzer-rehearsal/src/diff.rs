@@ -139,6 +139,59 @@ mod tests {
     }
 
     #[test]
+    fn matching_nonempty_events_are_still_not_observable() {
+        // events/state_reads/state_writes must be NotObservable
+        // unconditionally, never derived from comparing the vectors
+        // themselves: the current backend does not populate them at
+        // all, so an "unchanged" verdict here would claim an
+        // observation that was never actually made, even if both sides
+        // happen to hold matching (backend-unfilled) data.
+        let event = EventObservation {
+            topics_xdr_hex: vec!["01".to_string()],
+            data_xdr_hex: "02".to_string(),
+        };
+        let access = StateAccessObservation {
+            key_xdr_hex: "03".to_string(),
+            durability: analyzer_state::Durability::Persistent,
+        };
+
+        let mut old = dummy_observation(ExecutionOutcome::Success, Some("00"));
+        old.events = vec![event.clone()];
+        old.state_reads = vec![access.clone()];
+        old.state_writes = vec![access.clone()];
+
+        let mut new = dummy_observation(ExecutionOutcome::Success, Some("00"));
+        new.events = vec![event];
+        new.state_reads = vec![access.clone()];
+        new.state_writes = vec![access];
+
+        let diff = diff_invocations(&old, &new);
+        assert_eq!(diff.events, Difference::NotObservable);
+        assert_eq!(diff.state_reads, Difference::NotObservable);
+        assert_eq!(diff.state_writes, Difference::NotObservable);
+    }
+
+    #[test]
+    fn reported_resource_usage_is_compared_not_marked_not_observable() {
+        let mut old = dummy_observation(ExecutionOutcome::Success, Some("00"));
+        old.resource_usage = ResourceUsage {
+            instructions_consumed: Some(100),
+            memory_bytes_consumed: Some(10),
+        };
+        let mut new = old.clone();
+        new.resource_usage = ResourceUsage {
+            instructions_consumed: Some(200),
+            memory_bytes_consumed: Some(10),
+        };
+
+        let diff = diff_invocations(&old, &new);
+        assert!(matches!(diff.resource_usage, Difference::Changed { .. }));
+
+        let same_diff = diff_invocations(&old, &old);
+        assert_eq!(same_diff.resource_usage, Difference::Unchanged);
+    }
+
+    #[test]
     fn candidate_execution_failure() {
         let old = dummy_observation(ExecutionOutcome::Success, Some("00"));
         let new = dummy_observation(
