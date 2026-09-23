@@ -17,9 +17,40 @@
 //! construction.
 
 use analyzer_core::{AnalysisStatus, Finding};
+use analyzer_evidence::{Evidence, EvidenceSource};
 use serde::{Deserialize, Serialize};
 
 use crate::schema::REPORT_SCHEMA_VERSION;
+
+/// One evidence record, represented as plain canonical data for
+/// serialization. This is what lets a reader take a [`ReportFinding`]'s
+/// `evidence` id and resolve it to the actual bounded observation that
+/// supports the finding, without re-running the analysis.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReportEvidence {
+    /// The deterministic, content-addressed id a [`ReportFinding`]'s
+    /// `evidence` list references.
+    pub id: String,
+    pub source: EvidenceSource,
+    /// What parser, comparison, or rule produced this observation.
+    pub producer: String,
+    pub location: Option<String>,
+    pub observation: String,
+}
+
+impl ReportEvidence {
+    /// Convert an internal [`Evidence`] record into its canonical
+    /// report form.
+    pub fn from_evidence(evidence: &Evidence) -> Self {
+        Self {
+            id: evidence.id().to_hex(),
+            source: evidence.source().clone(),
+            producer: evidence.producer().to_string(),
+            location: evidence.location().map(str::to_string),
+            observation: evidence.observation().to_string(),
+        }
+    }
+}
 
 /// One finding, represented as plain canonical data for serialization.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,6 +111,13 @@ pub struct AnalysisReport {
     pub current_executable: ReportExecutableIdentity,
     pub candidate_executable: ReportExecutableIdentity,
     pub status: String,
+    pub rehearsal: Option<ReportRehearsal>,
+    /// Every evidence record any finding below references, in
+    /// encounter order. A finding's `evidence` entries are ids into
+    /// this list; a record that no finding references is never added
+    /// (this analyzer does not attach placeholder evidence merely to
+    /// make a list non-empty).
+    pub evidence: Vec<ReportEvidence>,
     pub findings: Vec<ReportFinding>,
 }
 
@@ -87,7 +125,10 @@ impl AnalysisReport {
     /// Construct a canonical report at the current [`REPORT_SCHEMA_VERSION`].
     ///
     /// `findings` must already be in the caller's intended, deterministic
-    /// order; this constructor does not reorder them.
+    /// order; this constructor does not reorder them. `evidence` must
+    /// likewise already be in the caller's intended (typically
+    /// encounter) order.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         analyzer_version: impl Into<String>,
         protocol_context: Option<u32>,
@@ -95,6 +136,8 @@ impl AnalysisReport {
         candidate_executable: ReportExecutableIdentity,
         status: AnalysisStatus,
         findings: &[Finding],
+        rehearsal: Option<ReportRehearsal>,
+        evidence: &[Evidence],
     ) -> Self {
         Self {
             schema_version: REPORT_SCHEMA_VERSION.to_string(),
@@ -103,6 +146,8 @@ impl AnalysisReport {
             current_executable,
             candidate_executable,
             status: status.to_string(),
+            rehearsal,
+            evidence: evidence.iter().map(ReportEvidence::from_evidence).collect(),
             findings: findings.iter().map(ReportFinding::from_finding).collect(),
         }
     }
@@ -129,8 +174,99 @@ mod tests {
             },
             AnalysisStatus::NoDetectedBlockers,
             &[],
+            None,
+            &[],
         );
         assert_eq!(report.schema_version, REPORT_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn report_carries_real_evidence_and_findings_reference_it() {
+        let evidence = Evidence::new(
+            EvidenceSource::LocalArtifact {
+                artifact_hash: "a".repeat(64),
+            },
+            "analyzer-executable::artifact",
+            None,
+            "candidate hash differs from current hash",
+        );
+        let finding = Finding::new(
+            FindingCategory::Executable,
+            Rule::ExecutableHashChanged,
+            "executable",
+            "s",
+            "d",
+            Severity::Info,
+            Confidence::Detected,
+            vec![evidence.id()],
+        );
+
+        let report = AnalysisReport::new(
+            "0.1.0",
+            None,
+            ReportExecutableIdentity {
+                hash: "a".repeat(64),
+                byte_length: 8,
+            },
+            ReportExecutableIdentity {
+                hash: "b".repeat(64),
+                byte_length: 8,
+            },
+            AnalysisStatus::NoDetectedBlockers,
+            std::slice::from_ref(&finding),
+            None,
+            std::slice::from_ref(&evidence),
+        );
+
+        assert_eq!(report.evidence.len(), 1);
+        assert_eq!(report.evidence[0].id, evidence.id().to_hex());
+        assert_eq!(report.findings[0].evidence, vec![evidence.id().to_hex()]);
+        // The finding's evidence id must actually resolve to a record
+        // present in the report's own evidence list.
+        assert!(report
+            .evidence
+            .iter()
+            .any(|e| e.id == report.findings[0].evidence[0]));
+    }
+
+    #[test]
+    fn evidence_ordering_is_encounter_order_not_reordered() {
+        let a = Evidence::new(
+            EvidenceSource::LocalArtifact {
+                artifact_hash: "a".repeat(64),
+            },
+            "p",
+            None,
+            "second observation, added first",
+        );
+        let b = Evidence::new(
+            EvidenceSource::LocalArtifact {
+                artifact_hash: "a".repeat(64),
+            },
+            "p",
+            None,
+            "first observation, added second",
+        );
+
+        let report = AnalysisReport::new(
+            "0.1.0",
+            None,
+            ReportExecutableIdentity {
+                hash: "a".repeat(64),
+                byte_length: 8,
+            },
+            ReportExecutableIdentity {
+                hash: "b".repeat(64),
+                byte_length: 8,
+            },
+            AnalysisStatus::NoDetectedBlockers,
+            &[],
+            None,
+            &[a.clone(), b.clone()],
+        );
+
+        assert_eq!(report.evidence[0].id, a.id().to_hex());
+        assert_eq!(report.evidence[1].id, b.id().to_hex());
     }
 
     #[test]
@@ -159,4 +295,15 @@ mod tests {
             Some("review the diff".to_string())
         );
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReportRehearsal {
+    pub requested: bool,
+    pub ran: bool,
+    pub backend_used: Option<String>,
+    pub observations_captured: Vec<String>,
+    pub observations_unavailable: Vec<String>,
+    pub behavioral_differences_established: Vec<String>,
+    pub remains_unverified: Vec<String>,
 }

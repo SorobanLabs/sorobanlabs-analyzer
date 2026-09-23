@@ -23,16 +23,23 @@
 //! built on the official `soroban-env-host`; see that module's docs for
 //! the feasibility evidence and its current scope (return
 //! value/success/error/trap/blocked outcome only; events, state
-//! access, and resource usage are not yet captured). Rehearsal
-//! fixtures beyond the single minimal one this module's tests use, and
-//! comparing the two sides' observations into a behavioral diff, are
-//! later steps.
+//! access, and resource usage are not yet captured, and are
+//! distinguished from "unchanged" as [`diff::Difference::NotObservable`]
+//! rather than compared). [`diff::diff_invocations`] compares two
+//! sides' observations into a [`diff::BehavioralDiff`]; a fixture
+//! corpus of current/candidate WASM pairs exercising it lives under
+//! `fixtures/executable/` (see `fixtures/executable-src/rehearsal-corpus/`
+//! for their source). See [`input`]'s module docs for exactly which
+//! [`input::RehearsalInput`] fields the current backend actually
+//! consumes; several are recorded but not yet read.
 
+pub mod diff;
 pub mod host;
 pub mod input;
 pub mod observation;
 pub mod trace;
 
+pub use diff::{diff_invocations, BehavioralDiff, Difference};
 pub use host::rehearse_invocation;
 pub use input::{ExecutionLimits, RehearsalInput, RehearsalInvocation};
 pub use observation::{

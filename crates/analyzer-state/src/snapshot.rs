@@ -2,8 +2,8 @@
 //!
 //! `StateSnapshot` is provider-neutral: it is the same shape whether it
 //! was built from a local JSON file ([`crate::source::LocalSnapshotSource`])
-//! or read from a live network (the read-only RPC source added in a
-//! later step). Every field here is either a scalar, an XDR-derived hex
+//! or read from a live network ([`crate::rpc::RpcStateSource`], the
+//! read-only RPC source). Every field here is either a scalar, an XDR-derived hex
 //! string, or a caller-ordered `Vec`; there is no `HashMap`, so
 //! serializing a snapshot is deterministic.
 //!

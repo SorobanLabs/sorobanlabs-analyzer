@@ -50,6 +50,8 @@ mod tests {
             },
             AnalysisStatus::NoDetectedBlockers,
             &[],
+            None,
+            &[],
         )
     }
 

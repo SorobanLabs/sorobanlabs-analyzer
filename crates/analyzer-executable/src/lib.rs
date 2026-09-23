@@ -6,13 +6,14 @@
 //! normalization, and current-vs-candidate executable comparison.
 //! All outputs must be deterministic.
 //!
-//! This version establishes local WASM artifact loading and canonical
+//! This crate provides: local WASM artifact loading and canonical
 //! byte-level identity ([`LoadedWasm`], [`ArtifactHash`],
-//! [`ArtifactSource`]), generic and Soroban-specific structural WASM
-//! validation ([`validation`]), Soroban environment metadata parsing
-//! ([`environment_meta`]), and Soroban contract metadata parsing
-//! ([`contract_meta`]). Contract specification parsing and interface
-//! diffing are added in later steps.
+//! [`ArtifactSource`]); generic and Soroban-specific structural WASM
+//! validation ([`validation`]); Soroban environment metadata parsing
+//! ([`environment_meta`]); Soroban contract metadata parsing
+//! ([`contract_meta`]); contract specification parsing
+//! ([`contract_spec`]) and its normalized interface form ([`interface`]);
+//! and current-vs-candidate interface diffing ([`diff`]).
 
 mod artifact;
 mod contract_meta;

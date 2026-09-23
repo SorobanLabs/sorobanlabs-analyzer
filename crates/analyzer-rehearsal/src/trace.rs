@@ -2,8 +2,8 @@
 //! same invocations against the current and candidate executables.
 //!
 //! This module models the *shape* of a completed rehearsal; comparing
-//! the two sides to produce a behavioral diff is a later step. Keeping
-//! the trace and its comparison separate mirrors how
+//! the two sides to produce a behavioral diff is [`crate::diff`].
+//! Keeping the trace and its comparison separate mirrors how
 //! `analyzer_executable::interface` (normalization) and
 //! `analyzer_executable::diff` (comparison) stay separate.
 

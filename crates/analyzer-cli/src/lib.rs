@@ -1,9 +1,12 @@
-//! Library half of the SorobanLabs Analyzer CLI: pipeline orchestration.
+//! Library half of the SorobanLabs Analyzer CLI: argument definitions,
+//! command implementations, and pipeline orchestration.
 //!
-//! The binary (`src/main.rs`) stays a thin CLI entry point; the actual
-//! sequencing of calls into the analysis crates lives here so it is
-//! unit-testable independent of argument parsing. See
-//! [`orchestration`] for why this orchestration lives in
-//! `analyzer-cli` rather than `analyzer-core`.
+//! The binary (`src/main.rs`) stays a thin entry point that parses
+//! [`cli::Cli`], dispatches to [`commands`], and exits with the
+//! returned process code. See [`orchestration`] for why the actual
+//! pipeline sequencing lives in `analyzer-cli` rather than
+//! `analyzer-core`.
 
+pub mod cli;
+pub mod commands;
 pub mod orchestration;

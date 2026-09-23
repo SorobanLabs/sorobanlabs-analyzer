@@ -20,11 +20,19 @@ an explicit confidence level.
   rule-identified findings.
 - Represents known contract state and compares state requirements
   between the current and candidate executables.
-- Extracts and compares the authorization surface (entrypoint,
-  authorization requirement, principal, check).
+- Extracts and compares each entrypoint's authorization surface: which
+  authorization primitives, if any, it directly calls. This is limited
+  to *direct* calls from an entrypoint's own function body; it does not
+  trace calls through helper functions, and it never infers a
+  principal (which `Address` is being checked) or a signer's identity,
+  so "no direct call observed" is not the same finding as "this
+  entrypoint is unprotected".
+- When given a rehearsal manifest, runs the same invocations against both
+  executables under a real, bounded Soroban host backend and reports
+  observed behavioral differences (return value, execution outcome).
 - Attaches evidence to every meaningful finding.
-- Produces a versioned, deterministic canonical JSON report, plus
-  Markdown and terminal renderings.
+- Produces a versioned, deterministic canonical JSON report, plus a
+  terminal rendering of the same data.
 
 ## What the analyzer does not do
 
@@ -69,13 +77,20 @@ Top-level analysis status is one of:
 
 ```
 crates/
-  analyzer-core        domain model and orchestration
+  analyzer-core        domain model: errors, findings, confidence,
+                       severity, status, upgrade plan
   analyzer-executable   executable loading, WASM inspection, interface diff
   analyzer-state        state snapshots and compatibility analysis
   analyzer-auth         authorization surface extraction and diff
+  analyzer-rehearsal    controlled upgrade rehearsal (Soroban host backend)
   analyzer-evidence     evidence model backing findings
-  analyzer-report       JSON/Markdown/terminal report rendering
-  analyzer-cli          command-line interface (orchestration only)
+  analyzer-report       JSON report and terminal report rendering
+  analyzer-cli          command-line interface AND the concrete
+                       pipeline orchestration (sequencing calls into
+                       the crates above); it lives here, not in
+                       analyzer-core, to avoid a dependency cycle,
+                       since analyzer-executable/-state/-auth/-report
+                       all depend on analyzer-core
 fixtures/    declarative fixtures used by the test suite
 schemas/     versioned JSON schemas for canonical output
 examples/    example inputs and outputs
@@ -86,12 +101,41 @@ scripts/     development and CI helper scripts
 
 ## Status
 
-This repository is in early, active development. The crate structure and
-toolchain are established; the analysis pipeline, CLI commands, and
-report schema are implemented incrementally. Controlled upgrade rehearsal
-(running old and candidate executables against representative state and
-comparing observable behavior) is a planned major subsystem and is not
-yet implemented.
+This repository is in early, active development. The analysis pipeline
+(executable identity, interface diff, state compatibility, authorization
+diff, and controlled rehearsal) and the `analyze` CLI command are
+implemented; further CLI commands and report formats are added
+incrementally as they are needed.
+
+## CLI usage
+
+```
+cargo run -p analyzer-cli -- analyze \
+  --current path/to/current.wasm \
+  --candidate path/to/candidate.wasm
+```
+
+Required: `--current` and `--candidate` (paths to the two executables).
+
+Optional:
+
+- `--protocol <NUMBER>`: the Soroban protocol number to record the
+  analysis against.
+- `--migration-manifest <PATH>`: an author-supplied migration manifest
+  (JSON), treated as a declaration, not proof.
+- `--rehearsal <PATH>`: a rehearsal input file (JSON) describing
+  invocations to run against both executables under the real
+  `soroban-env-host` backend.
+- `--format <json|terminal>`: output format; `terminal` (the default)
+  prints a human-readable report, `json` prints the canonical report
+  (see `schemas/analysis-result.schema.json`).
+
+Exit codes: `0` means the analysis pipeline completed, regardless of the
+report's own `status` field (which may be `NO_DETECTED_BLOCKERS`,
+`REVIEW_REQUIRED`, `MIGRATION_REQUIRED`, or `INCONCLUSIVE`); a non-zero
+code means the CLI itself could not complete (invalid input, a missing
+or unreadable file, or an internal analysis failure). Run
+`sorobanlabs-analyzer --help` for the full table.
 
 ## Development setup
 

@@ -3,10 +3,15 @@
 //! This module sequences calls into the underlying analysis crates in
 //! the order: identity -> validation -> environment metadata ->
 //! contract specification -> interface diff -> state compatibility ->
-//! authorization comparison -> finding synthesis -> canonical report.
-//! Rehearsal is not implemented yet (a later step); its absence is
-//! surfaced as an explicit limitation, not silently skipped and not an
-//! exception.
+//! authorization comparison -> finding synthesis -> rehearsal ->
+//! canonical report.
+//!
+//! Rehearsal only runs when the caller supplies
+//! [`AnalysisRequest::rehearsal_input`]; the pipeline never invokes the
+//! `analyzer-rehearsal` backend on its own. When rehearsal input is
+//! absent, that absence is surfaced as an explicit
+//! `REHEARSAL_FAILED` finding at [`Confidence::NotDeterminable`], not
+//! silently skipped.
 //!
 //! # Why this lives in `analyzer-cli`, not `analyzer-core`
 //!
@@ -39,6 +44,7 @@ use analyzer_auth::{
 use analyzer_core::{
     AnalysisStatus, AnalyzerError, Confidence, Finding, FindingCategory, Rule, Severity,
 };
+use analyzer_evidence::{Evidence, EvidenceCollector, EvidenceSource};
 use analyzer_executable::{
     diff_interfaces, normalize_interface, parse_contract_spec, parse_environment_metadata,
     EnumChange, ErrorEnumChange, EventChange, FunctionChange, LoadedWasm, StructChange,
@@ -65,6 +71,7 @@ pub struct AnalysisRequest<'a> {
     pub migration_manifest: Option<&'a MigrationManifest>,
     /// The analyzer's own version string, recorded in the report.
     pub analyzer_version: &'a str,
+    pub rehearsal_input: Option<&'a analyzer_rehearsal::RehearsalInput>,
 }
 
 /// Run the full upgrade analysis pipeline and produce a canonical
@@ -84,33 +91,181 @@ pub fn run_upgrade_analysis(request: &AnalysisRequest) -> Result<AnalysisReport,
     let candidate = LoadedWasm::from_path(request.candidate_path)?;
 
     let mut findings = Vec::new();
+    let mut evidence = EvidenceCollector::new();
 
-    synthesize_identity_findings(&current, &candidate, &mut findings);
-    synthesize_structural_findings(&current, &candidate, &mut findings);
-    synthesize_environment_findings(&current, &candidate, &mut findings);
-    synthesize_interface_findings(&current, &candidate, &mut findings)?;
+    synthesize_identity_findings(&current, &candidate, &mut findings, &mut evidence);
+    synthesize_structural_findings(&current, &candidate, &mut findings, &mut evidence);
+    synthesize_environment_findings(&current, &candidate, &mut findings, &mut evidence);
+    synthesize_interface_findings(&current, &candidate, &mut findings, &mut evidence)?;
     synthesize_state_findings(
         &current,
         &candidate,
         request.migration_manifest,
         &mut findings,
+        &mut evidence,
     );
-    synthesize_authorization_findings(&current, &candidate, &mut findings)?;
+    synthesize_authorization_findings(&current, &candidate, &mut findings, &mut evidence)?;
+    let report_rehearsal = if let Some(rehearsal) = request.rehearsal_input {
+        let mut ran = true;
+        let mut diffs = Vec::new();
 
-    // Rehearsal is not implemented yet. Surface that explicitly rather
-    // than silently omitting any behavioral comparison.
-    findings.push(Finding::new(
-        FindingCategory::Rehearsal,
-        Rule::RehearsalFailed,
-        "rehearsal",
-        "controlled rehearsal was not performed",
-        "This analyzer does not yet implement controlled upgrade rehearsal (behavioral comparison \
-         under representative state). No observation about runtime behavior differences between \
-         the current and candidate executables was made.",
-        Severity::Info,
-        Confidence::NotDeterminable,
-        vec![],
-    ));
+        for invocation in &rehearsal.invocations {
+            let current_obs = analyzer_rehearsal::rehearse_invocation(
+                current.bytes(),
+                invocation,
+                &rehearsal.execution_limits,
+            );
+
+            let candidate_obs = analyzer_rehearsal::rehearse_invocation(
+                candidate.bytes(),
+                invocation,
+                &rehearsal.execution_limits,
+            );
+
+            if matches!(
+                candidate_obs.outcome,
+                analyzer_rehearsal::ExecutionOutcome::Blocked { .. }
+            ) {
+                ran = false;
+                let ev = record_evidence(
+                    &mut evidence,
+                    EvidenceSource::ExecutionTrace {
+                        invocation: invocation.label.clone(),
+                    },
+                    "analyzer-rehearsal::host",
+                    Some(invocation.label.clone()),
+                    format!("candidate execution outcome: {:?}", candidate_obs.outcome),
+                );
+                findings.push(Finding::new(
+                    FindingCategory::Rehearsal,
+                    Rule::RehearsalFailed,
+                    &invocation.label,
+                    "candidate execution was blocked by the host",
+                    "the rehearsal backend could not execute the candidate safely or meaningfully",
+                    Severity::High,
+                    Confidence::Detected,
+                    vec![ev],
+                ));
+            } else if matches!(
+                current_obs.outcome,
+                analyzer_rehearsal::ExecutionOutcome::Blocked { .. }
+            ) {
+                ran = false;
+                let ev = record_evidence(
+                    &mut evidence,
+                    EvidenceSource::ExecutionTrace {
+                        invocation: invocation.label.clone(),
+                    },
+                    "analyzer-rehearsal::host",
+                    Some(invocation.label.clone()),
+                    format!("current execution outcome: {:?}", current_obs.outcome),
+                );
+                findings.push(Finding::new(
+                    FindingCategory::Rehearsal,
+                    Rule::RehearsalFailed,
+                    &invocation.label,
+                    "current execution was blocked by the host",
+                    "the rehearsal backend could not execute the current executable safely or meaningfully",
+                    Severity::High,
+                    Confidence::Detected,
+                    vec![ev],
+                ));
+            } else {
+                let diff = analyzer_rehearsal::diff::diff_invocations(&current_obs, &candidate_obs);
+
+                if let analyzer_rehearsal::Difference::Changed { old, new } = &diff.outcome {
+                    let ev = record_evidence(
+                        &mut evidence,
+                        EvidenceSource::ExecutionTrace {
+                            invocation: invocation.label.clone(),
+                        },
+                        "analyzer-rehearsal::diff",
+                        Some(invocation.label.clone()),
+                        format!("execution outcome changed: {old:?} -> {new:?}"),
+                    );
+                    findings.push(Finding::new(
+                        FindingCategory::Rehearsal,
+                        Rule::RehearsalResultChanged,
+                        &invocation.label,
+                        "invocation execution outcome changed",
+                        "the candidate returned a different outcome type (e.g. Success vs Trap) than the current executable",
+                        Severity::High,
+                        Confidence::Detected,
+                        vec![ev],
+                    ));
+                    diffs.push("outcome".to_string());
+                }
+
+                if let analyzer_rehearsal::Difference::Changed { old, new } = &diff.return_value {
+                    let ev = record_evidence(
+                        &mut evidence,
+                        EvidenceSource::ExecutionTrace {
+                            invocation: invocation.label.clone(),
+                        },
+                        "analyzer-rehearsal::diff",
+                        Some(invocation.label.clone()),
+                        format!("return value changed: {old:?} -> {new:?}"),
+                    );
+                    findings.push(Finding::new(
+                        FindingCategory::Rehearsal,
+                        Rule::RehearsalResultChanged,
+                        &invocation.label,
+                        "invocation return value changed",
+                        "the candidate returned a different value than the current executable",
+                        Severity::High,
+                        Confidence::Detected,
+                        vec![ev],
+                    ));
+                    diffs.push("return_value".to_string());
+                }
+            }
+        }
+
+        let obs_unavail = vec![
+            "events".to_string(),
+            "state_reads".to_string(),
+            "state_writes".to_string(),
+            "resource_usage".to_string(),
+        ];
+
+        Some(analyzer_report::ReportRehearsal {
+            requested: true,
+            ran,
+            backend_used: Some("soroban-env-host".to_string()),
+            observations_captured: vec!["outcome".to_string(), "return_value".to_string()],
+            observations_unavailable: obs_unavail,
+            behavioral_differences_established: diffs,
+            remains_unverified: vec![
+                "events".to_string(),
+                "state".to_string(),
+                "authorization".to_string(),
+                "resource_usage".to_string(),
+            ],
+        })
+    } else {
+        findings.push(Finding::new(
+            FindingCategory::Rehearsal,
+            Rule::RehearsalFailed,
+            "rehearsal",
+            "controlled rehearsal was not requested",
+            "the analysis pipeline was run without a rehearsal manifest; \
+             no observation about runtime behaviour differences between \
+             the current and candidate executables was made",
+            Severity::Info,
+            Confidence::NotDeterminable,
+            vec![],
+        ));
+
+        Some(analyzer_report::ReportRehearsal {
+            requested: false,
+            ran: false,
+            backend_used: None,
+            observations_captured: vec![],
+            observations_unavailable: vec![],
+            behavioral_differences_established: vec![],
+            remains_unverified: vec!["all execution behavior".to_string()],
+        })
+    };
 
     let status = overall_status(&findings);
 
@@ -127,15 +282,48 @@ pub fn run_upgrade_analysis(request: &AnalysisRequest) -> Result<AnalysisReport,
         },
         status,
         &findings,
+        report_rehearsal,
+        &evidence.into_records(),
     ))
+}
+
+/// Construct an [`Evidence`] record, record it in `collector`, and
+/// return its id, ready to attach to a [`Finding`]. A thin, explicit
+/// wrapper so every call site at least states what it is claiming as
+/// evidence, rather than a bare `vec![]`.
+fn record_evidence(
+    collector: &mut EvidenceCollector,
+    source: EvidenceSource,
+    producer: &str,
+    location: Option<String>,
+    observation: impl Into<String>,
+) -> analyzer_evidence::EvidenceId {
+    let evidence = Evidence::new(source, producer, location, observation);
+    let id = evidence.id();
+    collector.record(evidence);
+    id
 }
 
 fn synthesize_identity_findings(
     current: &LoadedWasm,
     candidate: &LoadedWasm,
     findings: &mut Vec<Finding>,
+    evidence: &mut EvidenceCollector,
 ) {
     if current.hash() != candidate.hash() {
+        let ev = record_evidence(
+            evidence,
+            EvidenceSource::DerivedComparison {
+                inputs: vec![current.hash().to_hex(), candidate.hash().to_hex()],
+            },
+            "analyzer-executable::artifact",
+            None,
+            format!(
+                "current SHA-256 {} != candidate SHA-256 {}",
+                current.hash(),
+                candidate.hash()
+            ),
+        );
         findings.push(Finding::new(
             FindingCategory::Executable,
             Rule::ExecutableHashChanged,
@@ -148,7 +336,7 @@ fn synthesize_identity_findings(
             ),
             Severity::Info,
             Confidence::Detected,
-            vec![],
+            vec![ev],
         ));
     }
 }
@@ -157,6 +345,7 @@ fn synthesize_structural_findings(
     current: &LoadedWasm,
     candidate: &LoadedWasm,
     findings: &mut Vec<Finding>,
+    evidence: &mut EvidenceCollector,
 ) {
     for (subject, loaded) in [
         ("current executable", current),
@@ -169,6 +358,15 @@ fn synthesize_structural_findings(
                 .iter()
                 .map(ToString::to_string)
                 .collect();
+            let ev = record_evidence(
+                evidence,
+                EvidenceSource::LocalArtifact {
+                    artifact_hash: loaded.hash().to_hex(),
+                },
+                "analyzer-executable::validation",
+                None,
+                format!("violations: {}", violations.join(", ")),
+            );
             findings.push(Finding::new(
                 FindingCategory::Executable,
                 Rule::ExecutableStructurallyIncompatible,
@@ -177,7 +375,7 @@ fn synthesize_structural_findings(
                 format!("violations: {}", violations.join(", ")),
                 Severity::High,
                 Confidence::Detected,
-                vec![],
+                vec![ev],
             ));
         }
     }
@@ -187,6 +385,7 @@ fn synthesize_environment_findings(
     current: &LoadedWasm,
     candidate: &LoadedWasm,
     findings: &mut Vec<Finding>,
+    evidence: &mut EvidenceCollector,
 ) {
     let current_meta = parse_environment_metadata(current.bytes());
     let candidate_meta = parse_environment_metadata(candidate.bytes());
@@ -200,6 +399,19 @@ fn synthesize_environment_findings(
     };
 
     if !current_meta.is_present() || !candidate_meta.is_present() {
+        let ev = record_evidence(
+            evidence,
+            EvidenceSource::DerivedComparison {
+                inputs: vec![current.hash().to_hex(), candidate.hash().to_hex()],
+            },
+            "analyzer-executable::environment_meta",
+            Some("contractenvmetav0".to_string()),
+            format!(
+                "current present: {}, candidate present: {}",
+                current_meta.is_present(),
+                candidate_meta.is_present()
+            ),
+        );
         findings.push(Finding::new(
             FindingCategory::Environment,
             Rule::EnvironmentMetadataMissing,
@@ -212,7 +424,7 @@ fn synthesize_environment_findings(
             ),
             Severity::Medium,
             Confidence::Detected,
-            vec![],
+            vec![ev],
         ));
         return;
     }
@@ -222,6 +434,21 @@ fn synthesize_environment_findings(
         candidate_meta.primary_interface_version(),
     ) {
         if current_version != candidate_version {
+            let ev = record_evidence(
+                evidence,
+                EvidenceSource::DerivedComparison {
+                    inputs: vec![current.hash().to_hex(), candidate.hash().to_hex()],
+                },
+                "analyzer-executable::environment_meta",
+                Some("contractenvmetav0".to_string()),
+                format!(
+                    "current protocol {}.{} -> candidate protocol {}.{}",
+                    current_version.protocol,
+                    current_version.pre_release,
+                    candidate_version.protocol,
+                    candidate_version.pre_release
+                ),
+            );
             findings.push(Finding::new(
                 FindingCategory::Environment,
                 Rule::EnvironmentInterfaceChanged,
@@ -236,7 +463,7 @@ fn synthesize_environment_findings(
                 ),
                 Severity::Medium,
                 Confidence::Detected,
-                vec![],
+                vec![ev],
             ));
         }
     }
@@ -246,6 +473,7 @@ fn synthesize_interface_findings(
     current: &LoadedWasm,
     candidate: &LoadedWasm,
     findings: &mut Vec<Finding>,
+    evidence: &mut EvidenceCollector,
 ) -> Result<(), AnalyzerError> {
     let current_spec = parse_contract_spec(current.bytes())?;
     let candidate_spec = parse_contract_spec(candidate.bytes())?;
@@ -261,140 +489,248 @@ fn synthesize_interface_findings(
     let candidate_interface = normalize_interface(candidate_spec.entries())?;
     let diff = diff_interfaces(&current_interface, &candidate_interface);
 
+    // Every interface finding below is derived from the two
+    // executables' contractspecv0 sections. Which side (or both) the
+    // evidence names must match which side the underlying fact is
+    // actually about: an "Added" fact only exists in the candidate's
+    // section, a "Removed" fact only in the current section, and a
+    // "Changed" fact requires comparing both.
+    let spec_evidence = |evidence: &mut EvidenceCollector,
+                         side: InterfaceEvidenceSide,
+                         name: &str,
+                         observation: String| {
+        let source = match side {
+            InterfaceEvidenceSide::Current => EvidenceSource::CustomWasmSection {
+                artifact_hash: current.hash().to_hex(),
+                section_name: "contractspecv0".to_string(),
+            },
+            InterfaceEvidenceSide::Candidate => EvidenceSource::CustomWasmSection {
+                artifact_hash: candidate.hash().to_hex(),
+                section_name: "contractspecv0".to_string(),
+            },
+            InterfaceEvidenceSide::Both => EvidenceSource::DerivedComparison {
+                inputs: vec![current.hash().to_hex(), candidate.hash().to_hex()],
+            },
+        };
+        record_evidence(
+            evidence,
+            source,
+            "analyzer-executable::diff",
+            Some(name.to_string()),
+            observation,
+        )
+    };
+
     for change in &diff.function_changes {
         match change {
-            FunctionChange::Added { name } => findings.push(interface_finding(
-                Rule::ContractInterfaceAdded,
-                name,
-                "candidate adds a function the current executable does not have",
-                format!("added function '{name}'"),
-                Severity::Info,
-            )),
-            FunctionChange::Removed { name } => findings.push(interface_finding(
-                Rule::ContractInterfaceRemoved,
-                name,
-                "candidate removes a function the current executable has",
-                format!("removed function '{name}'"),
-                Severity::High,
-            )),
+            FunctionChange::Added { name } => {
+                let detail = format!("added function '{name}'");
+                let ev = spec_evidence(
+                    evidence,
+                    InterfaceEvidenceSide::Candidate,
+                    name,
+                    detail.clone(),
+                );
+                findings.push(interface_finding(
+                    Rule::ContractInterfaceAdded,
+                    name,
+                    "candidate adds a function the current executable does not have",
+                    detail,
+                    Severity::Info,
+                    ev,
+                ));
+            }
+            FunctionChange::Removed { name } => {
+                let detail = format!("removed function '{name}'");
+                let ev = spec_evidence(
+                    evidence,
+                    InterfaceEvidenceSide::Current,
+                    name,
+                    detail.clone(),
+                );
+                findings.push(interface_finding(
+                    Rule::ContractInterfaceRemoved,
+                    name,
+                    "candidate removes a function the current executable has",
+                    detail,
+                    Severity::High,
+                    ev,
+                ));
+            }
             FunctionChange::InputCountChanged {
                 name,
                 current_count,
                 candidate_count,
             } => {
+                let detail = format!("'{name}': {current_count} -> {candidate_count} inputs");
+                let ev = spec_evidence(evidence, InterfaceEvidenceSide::Both, name, detail.clone());
                 findings.push(interface_finding(
                     Rule::ContractSignatureChanged,
                     name,
                     "function input count changed",
-                    format!("'{name}': {current_count} -> {candidate_count} inputs"),
+                    detail,
                     Severity::High,
+                    ev,
                 ));
             }
-            FunctionChange::InputOrderChanged { name, .. } => findings.push(interface_finding(
-                Rule::ContractSignatureChanged,
-                name,
-                "function input order changed",
-                format!("'{name}': input parameters reordered"),
-                Severity::Medium,
-            )),
-            FunctionChange::InputChanged { name, index, .. } => findings.push(interface_finding(
-                Rule::ContractSignatureChanged,
-                name,
-                "function input changed",
-                format!("'{name}': input at position {index} changed"),
-                Severity::High,
-            )),
-            FunctionChange::OutputChanged { name, .. } => findings.push(interface_finding(
-                Rule::ContractSignatureChanged,
-                name,
-                "function output type changed",
-                format!("'{name}': return type changed"),
-                Severity::High,
-            )),
+            FunctionChange::InputOrderChanged { name, .. } => {
+                let detail = format!("'{name}': input parameters reordered");
+                let ev = spec_evidence(evidence, InterfaceEvidenceSide::Both, name, detail.clone());
+                findings.push(interface_finding(
+                    Rule::ContractSignatureChanged,
+                    name,
+                    "function input order changed",
+                    detail,
+                    Severity::Medium,
+                    ev,
+                ));
+            }
+            FunctionChange::InputChanged { name, index, .. } => {
+                let detail = format!("'{name}': input at position {index} changed");
+                let ev = spec_evidence(evidence, InterfaceEvidenceSide::Both, name, detail.clone());
+                findings.push(interface_finding(
+                    Rule::ContractSignatureChanged,
+                    name,
+                    "function input changed",
+                    detail,
+                    Severity::High,
+                    ev,
+                ));
+            }
+            FunctionChange::OutputChanged { name, .. } => {
+                let detail = format!("'{name}': return type changed");
+                let ev = spec_evidence(evidence, InterfaceEvidenceSide::Both, name, detail.clone());
+                findings.push(interface_finding(
+                    Rule::ContractSignatureChanged,
+                    name,
+                    "function output type changed",
+                    detail,
+                    Severity::High,
+                    ev,
+                ));
+            }
         }
     }
 
     for change in &diff.event_changes {
-        let (name, summary) = match change {
-            EventChange::Added { name } => (name, "event added".to_string()),
-            EventChange::Removed { name } => (name, "event removed".to_string()),
-            EventChange::PrefixTopicsChanged { name, .. } => {
-                (name, "event prefix topics changed".to_string())
-            }
-            EventChange::ParametersChanged { name, .. } => {
-                (name, "event parameters changed".to_string())
-            }
-            EventChange::DataFormatChanged { name, .. } => {
-                (name, "event data format changed".to_string())
-            }
+        let (name, side, summary) = match change {
+            EventChange::Added { name } => (
+                name,
+                InterfaceEvidenceSide::Candidate,
+                "event added".to_string(),
+            ),
+            EventChange::Removed { name } => (
+                name,
+                InterfaceEvidenceSide::Current,
+                "event removed".to_string(),
+            ),
+            EventChange::PrefixTopicsChanged { name, .. } => (
+                name,
+                InterfaceEvidenceSide::Both,
+                "event prefix topics changed".to_string(),
+            ),
+            EventChange::ParametersChanged { name, .. } => (
+                name,
+                InterfaceEvidenceSide::Both,
+                "event parameters changed".to_string(),
+            ),
+            EventChange::DataFormatChanged { name, .. } => (
+                name,
+                InterfaceEvidenceSide::Both,
+                "event data format changed".to_string(),
+            ),
         };
+        let ev = spec_evidence(evidence, side, name, summary.clone());
         findings.push(interface_finding(
             Rule::ContractEventChanged,
             name,
             "contract event changed",
             summary,
             Severity::Medium,
+            ev,
         ));
     }
 
     for change in &diff.struct_changes {
-        let name = match change {
-            StructChange::Added { name }
-            | StructChange::Removed { name }
-            | StructChange::FieldsChanged { name, .. } => name,
+        let (name, side) = match change {
+            StructChange::Added { name } => (name, InterfaceEvidenceSide::Candidate),
+            StructChange::Removed { name } => (name, InterfaceEvidenceSide::Current),
+            StructChange::FieldsChanged { name, .. } => (name, InterfaceEvidenceSide::Both),
         };
+        let detail = format!("struct '{name}' changed");
+        let ev = spec_evidence(evidence, side, name, detail.clone());
         findings.push(interface_finding(
             Rule::ContractTypeChanged,
             name,
             "user-defined struct type changed",
-            format!("struct '{name}' changed"),
+            detail,
             Severity::Medium,
+            ev,
         ));
     }
     for change in &diff.union_changes {
-        let name = match change {
-            UnionChange::Added { name }
-            | UnionChange::Removed { name }
-            | UnionChange::CasesChanged { name, .. } => name,
+        let (name, side) = match change {
+            UnionChange::Added { name } => (name, InterfaceEvidenceSide::Candidate),
+            UnionChange::Removed { name } => (name, InterfaceEvidenceSide::Current),
+            UnionChange::CasesChanged { name, .. } => (name, InterfaceEvidenceSide::Both),
         };
+        let detail = format!("union '{name}' changed");
+        let ev = spec_evidence(evidence, side, name, detail.clone());
         findings.push(interface_finding(
             Rule::ContractTypeChanged,
             name,
             "user-defined union type changed",
-            format!("union '{name}' changed"),
+            detail,
             Severity::Medium,
+            ev,
         ));
     }
     for change in &diff.enum_changes {
-        let name = match change {
-            EnumChange::Added { name }
-            | EnumChange::Removed { name }
-            | EnumChange::CasesChanged { name, .. } => name,
+        let (name, side) = match change {
+            EnumChange::Added { name } => (name, InterfaceEvidenceSide::Candidate),
+            EnumChange::Removed { name } => (name, InterfaceEvidenceSide::Current),
+            EnumChange::CasesChanged { name, .. } => (name, InterfaceEvidenceSide::Both),
         };
+        let detail = format!("enum '{name}' changed");
+        let ev = spec_evidence(evidence, side, name, detail.clone());
         findings.push(interface_finding(
             Rule::ContractTypeChanged,
             name,
             "user-defined enum type changed",
-            format!("enum '{name}' changed"),
+            detail,
             Severity::Medium,
+            ev,
         ));
     }
     for change in &diff.error_enum_changes {
-        let name = match change {
-            ErrorEnumChange::Added { name }
-            | ErrorEnumChange::Removed { name }
-            | ErrorEnumChange::CasesChanged { name, .. } => name,
+        let (name, side) = match change {
+            ErrorEnumChange::Added { name } => (name, InterfaceEvidenceSide::Candidate),
+            ErrorEnumChange::Removed { name } => (name, InterfaceEvidenceSide::Current),
+            ErrorEnumChange::CasesChanged { name, .. } => (name, InterfaceEvidenceSide::Both),
         };
+        let detail = format!("error enum '{name}' changed");
+        let ev = spec_evidence(evidence, side, name, detail.clone());
         findings.push(interface_finding(
             Rule::ContractTypeChanged,
             name,
             "user-defined error enum type changed",
-            format!("error enum '{name}' changed"),
+            detail,
             Severity::Medium,
+            ev,
         ));
     }
 
     Ok(())
+}
+
+/// Which side of an interface comparison an evidence record's source
+/// should name, matching which side the underlying fact is actually
+/// about (see `synthesize_interface_findings`).
+#[derive(Clone, Copy)]
+enum InterfaceEvidenceSide {
+    Current,
+    Candidate,
+    Both,
 }
 
 fn interface_finding(
@@ -403,6 +739,7 @@ fn interface_finding(
     summary: &str,
     detail: String,
     severity: Severity,
+    evidence: analyzer_evidence::EvidenceId,
 ) -> Finding {
     Finding::new(
         FindingCategory::Interface,
@@ -412,7 +749,7 @@ fn interface_finding(
         detail,
         severity,
         Confidence::Detected,
-        vec![],
+        vec![evidence],
     )
 }
 
@@ -421,6 +758,7 @@ fn synthesize_state_findings(
     candidate: &LoadedWasm,
     manifest: Option<&MigrationManifest>,
     findings: &mut Vec<Finding>,
+    evidence: &mut EvidenceCollector,
 ) {
     let current_form = ExecutableForm::Wasm {
         hash: current.hash().to_hex(),
@@ -432,8 +770,31 @@ fn synthesize_state_findings(
     let result = assess_state_compatibility(&current_form, &candidate_form, manifest);
     let reason_detail = result.reasons.join("; ");
 
+    if matches!(result.outcome, StateCompatibility::Compatible) {
+        return;
+    }
+
+    // When a manifest was supplied, it is the evidence this outcome is
+    // actually derived from (see assess_state_compatibility's doc
+    // comment: manifest-derived signals take priority). Otherwise the
+    // outcome is derived purely from comparing the two executable
+    // hashes.
+    let state_evidence_source = match manifest.and_then(|m| m.content_hash().ok()) {
+        Some(manifest_hash) => EvidenceSource::MigrationManifest { manifest_hash },
+        None => EvidenceSource::DerivedComparison {
+            inputs: vec![current.hash().to_hex(), candidate.hash().to_hex()],
+        },
+    };
+    let ev = record_evidence(
+        evidence,
+        state_evidence_source,
+        "analyzer-state::compatibility",
+        None,
+        reason_detail.clone(),
+    );
+
     match result.outcome {
-        StateCompatibility::Compatible => {}
+        StateCompatibility::Compatible => unreachable!("handled above"),
         StateCompatibility::RequiresMigration => findings.push(Finding::new(
             FindingCategory::State,
             Rule::MigrationRequired,
@@ -442,7 +803,7 @@ fn synthesize_state_findings(
             reason_detail,
             Severity::High,
             Confidence::Likely,
-            vec![],
+            vec![ev],
         )),
         StateCompatibility::PotentiallyIncompatible => findings.push(Finding::new(
             FindingCategory::State,
@@ -452,7 +813,7 @@ fn synthesize_state_findings(
             reason_detail,
             Severity::Medium,
             Confidence::Potential,
-            vec![],
+            vec![ev],
         )),
         StateCompatibility::NotDetermined => findings.push(Finding::new(
             FindingCategory::State,
@@ -462,7 +823,7 @@ fn synthesize_state_findings(
             reason_detail,
             Severity::Info,
             Confidence::NotDeterminable,
-            vec![],
+            vec![ev],
         )),
     }
 }
@@ -471,10 +832,15 @@ fn synthesize_authorization_findings(
     current: &LoadedWasm,
     candidate: &LoadedWasm,
     findings: &mut Vec<Finding>,
+    evidence: &mut EvidenceCollector,
 ) -> Result<(), AnalyzerError> {
     let current_surface = extract_authorization_surface(current.bytes())?;
     let candidate_surface = extract_authorization_surface(candidate.bytes())?;
     let diff = diff_authorization_surfaces(&current_surface, &candidate_surface);
+
+    // Captured before the match below, which shadows `current`/
+    // `candidate` with per-change field bindings of the same name.
+    let comparison_inputs = vec![current.hash().to_hex(), candidate.hash().to_hex()];
 
     for change in &diff.changes {
         match change {
@@ -488,72 +854,129 @@ fn synthesize_authorization_findings(
                 name,
                 previously_called,
             } => {
+                let detail = format!(
+                    "'{name}' previously directly called {previously_called:?}; the candidate's \
+                     version of '{name}' calls none directly. This does not prove the entrypoint \
+                     is unprotected: the check may have moved into a helper function this \
+                     analyzer does not trace transitively."
+                );
+                let ev = record_evidence(
+                    evidence,
+                    EvidenceSource::DerivedComparison {
+                        inputs: comparison_inputs.clone(),
+                    },
+                    "analyzer-auth::diff",
+                    Some(name.clone()),
+                    detail.clone(),
+                );
                 findings.push(Finding::new(
                     FindingCategory::Authorization,
                     Rule::AuthorizationRemoved,
                     name,
                     "entrypoint no longer directly calls an authorization primitive",
-                    format!(
-                        "'{name}' previously directly called {previously_called:?}; the candidate's \
-                         version of '{name}' calls none directly. This does not prove the entrypoint \
-                         is unprotected: the check may have moved into a helper function this \
-                         analyzer does not trace transitively."
-                    ),
+                    detail,
                     Severity::High,
                     Confidence::Likely,
-                    vec![],
+                    vec![ev],
                 ));
             }
             AuthorizationChange::EntrypointGainedAuthorizationCall { name, now_called } => {
+                let detail = format!("'{name}' now directly calls {now_called:?}");
+                let ev = record_evidence(
+                    evidence,
+                    EvidenceSource::DerivedComparison {
+                        inputs: comparison_inputs.clone(),
+                    },
+                    "analyzer-auth::diff",
+                    Some(name.clone()),
+                    detail.clone(),
+                );
                 findings.push(Finding::new(
                     FindingCategory::Authorization,
                     Rule::AuthorizationSurfaceChanged,
                     name,
                     "entrypoint gained a direct authorization call",
-                    format!("'{name}' now directly calls {now_called:?}"),
+                    detail,
                     Severity::Info,
                     Confidence::Detected,
-                    vec![],
+                    vec![ev],
                 ));
             }
             AuthorizationChange::AuthorizationPathChanged {
                 name,
-                current,
-                candidate,
+                current: current_calls,
+                candidate: candidate_calls,
             } => {
+                let detail = format!("'{name}': {current_calls:?} -> {candidate_calls:?}");
+                let ev = record_evidence(
+                    evidence,
+                    EvidenceSource::DerivedComparison {
+                        inputs: comparison_inputs.clone(),
+                    },
+                    "analyzer-auth::diff",
+                    Some(name.clone()),
+                    detail.clone(),
+                );
                 findings.push(Finding::new(
                     FindingCategory::Authorization,
                     Rule::AuthorizationSurfaceChanged,
                     name,
                     "entrypoint's directly-called authorization primitives changed",
-                    format!("'{name}': {current:?} -> {candidate:?}"),
+                    detail,
                     Severity::Medium,
                     Confidence::Detected,
-                    vec![],
+                    vec![ev],
                 ));
             }
-            AuthorizationChange::ModuleAuthPrimitiveImportChanged { current, candidate } => {
+            AuthorizationChange::ModuleAuthPrimitiveImportChanged {
+                current: current_imports,
+                candidate: candidate_imports,
+            } => {
+                let detail =
+                    format!("imports auth primitive: {current_imports} -> {candidate_imports}");
+                let ev = record_evidence(
+                    evidence,
+                    EvidenceSource::DerivedComparison {
+                        inputs: comparison_inputs.clone(),
+                    },
+                    "analyzer-auth::diff",
+                    Some("module".to_string()),
+                    detail.clone(),
+                );
                 findings.push(Finding::new(
                     FindingCategory::Authorization,
                     Rule::AuthorizationSurfaceChanged,
                     "module",
                     "whether the module imports any authorization primitive changed",
-                    format!("imports auth primitive: {current} -> {candidate}"),
+                    detail,
                     Severity::Medium,
                     Confidence::Detected,
-                    vec![],
+                    vec![ev],
                 ));
             }
-            AuthorizationChange::CustomAuthHookChanged { current, candidate } => {
+            AuthorizationChange::CustomAuthHookChanged {
+                current: current_hook,
+                candidate: candidate_hook,
+            } => {
+                let detail = format!("exports __check_auth: {current_hook} -> {candidate_hook}");
+                let ev = record_evidence(
+                    evidence,
+                    EvidenceSource::DerivedComparison {
+                        inputs: comparison_inputs.clone(),
+                    },
+                    "analyzer-auth::diff",
+                    Some("module".to_string()),
+                    detail.clone(),
+                );
                 findings.push(Finding::new(
                     FindingCategory::Authorization,
                     Rule::AuthorizationSurfaceChanged,
                     "module",
                     "custom account __check_auth hook presence changed",
-                    format!("exports __check_auth: {current} -> {candidate}"),
+                    detail,
                     Severity::High,
                     Confidence::Detected,
-                    vec![],
+                    vec![ev],
                 ));
             }
         }
@@ -618,6 +1041,7 @@ mod tests {
             protocol_context: Some(28),
             migration_manifest: None,
             analyzer_version: "0.1.0",
+            rehearsal_input: None,
         };
 
         let report = run_upgrade_analysis(&request).unwrap();
@@ -647,6 +1071,7 @@ mod tests {
             protocol_context: None,
             migration_manifest: None,
             analyzer_version: "0.1.0",
+            rehearsal_input: None,
         };
         let result = run_upgrade_analysis(&request);
         assert!(matches!(result, Err(AnalyzerError::Backend(_))));
@@ -667,6 +1092,7 @@ mod tests {
             protocol_context: None,
             migration_manifest: None,
             analyzer_version: "0.1.0",
+            rehearsal_input: None,
         };
 
         let report = run_upgrade_analysis(&request).unwrap();
@@ -674,6 +1100,149 @@ mod tests {
             .findings
             .iter()
             .any(|f| f.rule == "EXECUTABLE_HASH_CHANGED"));
+    }
+
+    fn second_module() -> Vec<u8> {
+        let mut second = MINIMAL_VALID.to_vec();
+        second.extend_from_slice(&[0x00, 0x07, 0x01, b'x', b'h', b'e', b'l', b'l', b'o']);
+        second
+    }
+
+    #[test]
+    fn executable_hash_changed_finding_references_real_evidence_in_the_report() {
+        let current = write_wasm(MINIMAL_VALID);
+        let candidate = write_wasm(&second_module());
+        let request = AnalysisRequest {
+            current_path: current.path(),
+            candidate_path: candidate.path(),
+            protocol_context: None,
+            migration_manifest: None,
+            analyzer_version: "0.1.0",
+            rehearsal_input: None,
+        };
+
+        let report = run_upgrade_analysis(&request).unwrap();
+        let finding = report
+            .findings
+            .iter()
+            .find(|f| f.rule == "EXECUTABLE_HASH_CHANGED")
+            .unwrap();
+
+        assert!(
+            !finding.evidence.is_empty(),
+            "EXECUTABLE_HASH_CHANGED must reference real evidence, not an empty vec"
+        );
+        // Every id the finding references must actually resolve to a
+        // record present in the report's own evidence list: this is
+        // the finding -> evidence id -> evidence record chain.
+        for evidence_id in &finding.evidence {
+            assert!(
+                report.evidence.iter().any(|e| &e.id == evidence_id),
+                "finding references evidence id {evidence_id} that is not in report.evidence"
+            );
+        }
+    }
+
+    #[test]
+    fn identical_analysis_inputs_produce_identical_evidence_ids() {
+        let current = write_wasm(MINIMAL_VALID);
+        let candidate = write_wasm(&second_module());
+        let request = AnalysisRequest {
+            current_path: current.path(),
+            candidate_path: candidate.path(),
+            protocol_context: None,
+            migration_manifest: None,
+            analyzer_version: "0.1.0",
+            rehearsal_input: None,
+        };
+
+        let first = run_upgrade_analysis(&request).unwrap();
+        let second = run_upgrade_analysis(&request).unwrap();
+
+        let first_ids: Vec<&str> = first.evidence.iter().map(|e| e.id.as_str()).collect();
+        let second_ids: Vec<&str> = second.evidence.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(
+            first_ids, second_ids,
+            "identical inputs must produce identical evidence ids in identical order"
+        );
+    }
+
+    #[test]
+    fn changing_the_candidate_changes_the_hash_comparison_evidence_id() {
+        let current = write_wasm(MINIMAL_VALID);
+        let candidate_a = write_wasm(&second_module());
+        // A distinct valid module: same shape as second_module(), but a
+        // different custom section name, so its bytes (and hash) differ
+        // from candidate_a without becoming truncated/invalid WASM.
+        let mut third = MINIMAL_VALID.to_vec();
+        third.extend_from_slice(&[0x00, 0x07, 0x01, b'y', b'h', b'e', b'l', b'l', b'o']);
+        let candidate_b = write_wasm(&third);
+
+        let request_a = AnalysisRequest {
+            current_path: current.path(),
+            candidate_path: candidate_a.path(),
+            protocol_context: None,
+            migration_manifest: None,
+            analyzer_version: "0.1.0",
+            rehearsal_input: None,
+        };
+        let request_b = AnalysisRequest {
+            candidate_path: candidate_b.path(),
+            ..request_a
+        };
+
+        let report_a = run_upgrade_analysis(&request_a).unwrap();
+        let report_b = run_upgrade_analysis(&request_b).unwrap();
+
+        let hash_evidence_id = |report: &AnalysisReport| {
+            let finding = report
+                .findings
+                .iter()
+                .find(|f| f.rule == "EXECUTABLE_HASH_CHANGED")
+                .unwrap();
+            finding.evidence[0].clone()
+        };
+
+        assert_ne!(
+            hash_evidence_id(&report_a),
+            hash_evidence_id(&report_b),
+            "a different candidate must change the hash-comparison evidence id"
+        );
+    }
+
+    #[test]
+    fn every_evidence_record_is_referenced_by_at_least_one_finding() {
+        // No fabricated placeholder evidence: this analyzer never
+        // records an evidence entry that nothing actually cites.
+        let current = write_wasm(MINIMAL_VALID);
+        let candidate = write_wasm(&second_module());
+        let request = AnalysisRequest {
+            current_path: current.path(),
+            candidate_path: candidate.path(),
+            protocol_context: None,
+            migration_manifest: None,
+            analyzer_version: "0.1.0",
+            rehearsal_input: None,
+        };
+
+        let report = run_upgrade_analysis(&request).unwrap();
+        assert!(
+            !report.evidence.is_empty(),
+            "test setup should produce some evidence"
+        );
+
+        let referenced: std::collections::HashSet<&str> = report
+            .findings
+            .iter()
+            .flat_map(|f| f.evidence.iter().map(String::as_str))
+            .collect();
+        for record in &report.evidence {
+            assert!(
+                referenced.contains(record.id.as_str()),
+                "evidence record {} is not referenced by any finding",
+                record.id
+            );
+        }
     }
 
     #[test]
@@ -694,5 +1263,273 @@ mod tests {
     #[test]
     fn overall_status_is_no_detected_blockers_for_empty_findings() {
         assert_eq!(overall_status(&[]), AnalysisStatus::NoDetectedBlockers);
+    }
+
+    #[test]
+    fn migration_manifest_evidence_and_finding_preserve_unverified_framing() {
+        use analyzer_state::MigrationFunction;
+
+        let current = write_wasm(MINIMAL_VALID);
+        let candidate = write_wasm(&second_module());
+        let manifest = MigrationManifest {
+            migration_function: Some(MigrationFunction {
+                name: "migrate".to_string(),
+                one_time: true,
+            }),
+            ..Default::default()
+        };
+        let request = AnalysisRequest {
+            current_path: current.path(),
+            candidate_path: candidate.path(),
+            protocol_context: None,
+            migration_manifest: Some(&manifest),
+            analyzer_version: "0.1.0",
+            rehearsal_input: None,
+        };
+
+        let report = run_upgrade_analysis(&request).unwrap();
+        let finding = report
+            .findings
+            .iter()
+            .find(|f| f.rule == "MIGRATION_REQUIRED")
+            .expect("manifest declares a migration function");
+        assert_eq!(finding.confidence, "LIKELY");
+        assert!(
+            finding.detail.starts_with("UNVERIFIED (author-supplied)"),
+            "finding detail lost the unverified-author-supplied framing: {}",
+            finding.detail
+        );
+
+        let evidence_id = finding.evidence.first().unwrap();
+        let evidence = report
+            .evidence
+            .iter()
+            .find(|e| &e.id == evidence_id)
+            .expect("evidence resolves from the report");
+        assert!(
+            evidence
+                .observation
+                .starts_with("UNVERIFIED (author-supplied)"),
+            "evidence observation lost the unverified-author-supplied framing: {}",
+            evidence.observation
+        );
+        assert!(matches!(
+            evidence.source,
+            EvidenceSource::MigrationManifest { .. }
+        ));
+    }
+
+    #[test]
+    fn rehearsal_ran_report_lists_resource_usage_as_remaining_unverified() {
+        let current = write_wasm(MINIMAL_VALID);
+        let candidate = write_wasm(MINIMAL_VALID);
+        let rehearsal_input = analyzer_rehearsal::RehearsalInput {
+            current_executable: MINIMAL_VALID.to_vec(),
+            candidate_executable: MINIMAL_VALID.to_vec(),
+            state_snapshot: None,
+            invocations: vec![],
+            protocol_context: Some(28),
+            execution_limits: analyzer_rehearsal::ExecutionLimits::default(),
+            deterministic_seed: None,
+        };
+        let request = AnalysisRequest {
+            current_path: current.path(),
+            candidate_path: candidate.path(),
+            protocol_context: None,
+            migration_manifest: None,
+            analyzer_version: "0.1.0",
+            rehearsal_input: Some(&rehearsal_input),
+        };
+
+        let report = run_upgrade_analysis(&request).unwrap();
+        let rehearsal = report.rehearsal.expect("rehearsal was requested");
+        assert!(rehearsal.ran);
+        assert!(rehearsal
+            .observations_unavailable
+            .contains(&"resource_usage".to_string()));
+        assert!(
+            rehearsal
+                .remains_unverified
+                .contains(&"resource_usage".to_string()),
+            "remains_unverified should list resource_usage consistently with observations_unavailable: {:?}",
+            rehearsal.remains_unverified
+        );
+        assert!(rehearsal.remains_unverified.contains(&"events".to_string()));
+        assert!(rehearsal.remains_unverified.contains(&"state".to_string()));
+        assert!(rehearsal
+            .remains_unverified
+            .contains(&"authorization".to_string()));
+    }
+
+    mod interface_evidence_provenance {
+        use super::*;
+        use stellar_xdr::{
+            Limits, ScSpecEntry, ScSpecFunctionInputV0, ScSpecFunctionV0, ScSpecTypeDef, ScSymbol,
+            StringM, VecM, WriteXdr,
+        };
+
+        fn write_leb128(out: &mut Vec<u8>, mut value: u64) {
+            loop {
+                let byte = (value & 0x7f) as u8;
+                value >>= 7;
+                if value == 0 {
+                    out.push(byte);
+                    break;
+                }
+                out.push(byte | 0x80);
+            }
+        }
+
+        fn custom_section(name: &str, data: &[u8]) -> Vec<u8> {
+            let mut name_bytes = Vec::new();
+            write_leb128(&mut name_bytes, name.len() as u64);
+            name_bytes.extend_from_slice(name.as_bytes());
+
+            let mut content = name_bytes;
+            content.extend_from_slice(data);
+
+            let mut section = vec![0x00];
+            write_leb128(&mut section, content.len() as u64);
+            section.extend_from_slice(&content);
+            section
+        }
+
+        fn symbol(s: &str) -> ScSymbol {
+            ScSymbol(StringM::try_from(s).unwrap())
+        }
+
+        fn simple_function(name: &str) -> ScSpecEntry {
+            ScSpecEntry::FunctionV0(ScSpecFunctionV0 {
+                doc: StringM::default(),
+                name: symbol(name),
+                inputs: VecM::try_from(vec![ScSpecFunctionInputV0 {
+                    doc: StringM::default(),
+                    name: StringM::try_from("amount").unwrap(),
+                    type_: ScSpecTypeDef::I128,
+                }])
+                .unwrap(),
+                outputs: VecM::default(),
+            })
+        }
+
+        fn function_with_extra_input(name: &str) -> ScSpecEntry {
+            ScSpecEntry::FunctionV0(ScSpecFunctionV0 {
+                doc: StringM::default(),
+                name: symbol(name),
+                inputs: VecM::try_from(vec![
+                    ScSpecFunctionInputV0 {
+                        doc: StringM::default(),
+                        name: StringM::try_from("amount").unwrap(),
+                        type_: ScSpecTypeDef::I128,
+                    },
+                    ScSpecFunctionInputV0 {
+                        doc: StringM::default(),
+                        name: StringM::try_from("memo").unwrap(),
+                        type_: ScSpecTypeDef::I128,
+                    },
+                ])
+                .unwrap(),
+                outputs: VecM::default(),
+            })
+        }
+
+        fn module_with_spec(entries: &[ScSpecEntry]) -> Vec<u8> {
+            let mut data = Vec::new();
+            for entry in entries {
+                data.extend_from_slice(&entry.to_xdr(Limits::none()).unwrap());
+            }
+            let mut module = MINIMAL_VALID.to_vec();
+            module.extend_from_slice(&custom_section("contractspecv0", &data));
+            module
+        }
+
+        fn analyze(current_bytes: &[u8], candidate_bytes: &[u8]) -> AnalysisReport {
+            let current = write_wasm(current_bytes);
+            let candidate = write_wasm(candidate_bytes);
+            let request = AnalysisRequest {
+                current_path: current.path(),
+                candidate_path: candidate.path(),
+                protocol_context: None,
+                migration_manifest: None,
+                analyzer_version: "0.1.0",
+                rehearsal_input: None,
+            };
+            run_upgrade_analysis(&request).unwrap()
+        }
+
+        fn evidence_for(report: &AnalysisReport, rule: &str) -> analyzer_evidence::EvidenceSource {
+            let finding = report
+                .findings
+                .iter()
+                .find(|f| f.rule == rule)
+                .unwrap_or_else(|| panic!("no {rule} finding in report"));
+            let evidence_id = finding.evidence.first().expect("finding has evidence");
+            report
+                .evidence
+                .iter()
+                .find(|e| &e.id == evidence_id)
+                .expect("evidence resolves from the report")
+                .source
+                .clone()
+        }
+
+        #[test]
+        fn added_function_evidence_names_the_candidate_side() {
+            let current = module_with_spec(&[]);
+            let candidate = module_with_spec(&[simple_function("transfer")]);
+
+            let report = analyze(&current, &candidate);
+            let candidate_hash = report.candidate_executable.hash.clone();
+            match evidence_for(&report, "CONTRACT_INTERFACE_ADDED") {
+                EvidenceSource::CustomWasmSection { artifact_hash, .. } => {
+                    assert_eq!(artifact_hash, candidate_hash);
+                }
+                other => panic!("expected CustomWasmSection, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn removed_function_evidence_names_the_current_side() {
+            let current = module_with_spec(&[simple_function("transfer")]);
+            let candidate = module_with_spec(&[]);
+
+            let report = analyze(&current, &candidate);
+            let current_hash = report.current_executable.hash.clone();
+            match evidence_for(&report, "CONTRACT_INTERFACE_REMOVED") {
+                EvidenceSource::CustomWasmSection { artifact_hash, .. } => {
+                    assert_eq!(artifact_hash, current_hash);
+                }
+                other => panic!("expected CustomWasmSection, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn changed_signature_evidence_references_both_sides() {
+            let current = module_with_spec(&[simple_function("transfer")]);
+            let candidate = module_with_spec(&[function_with_extra_input("transfer")]);
+
+            let report = analyze(&current, &candidate);
+            let current_hash = report.current_executable.hash.clone();
+            let candidate_hash = report.candidate_executable.hash.clone();
+            match evidence_for(&report, "CONTRACT_SIGNATURE_CHANGED") {
+                EvidenceSource::DerivedComparison { inputs } => {
+                    assert_eq!(inputs, vec![current_hash, candidate_hash]);
+                }
+                other => panic!("expected DerivedComparison, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn interface_evidence_ids_are_deterministic() {
+            let current = module_with_spec(&[simple_function("transfer")]);
+            let candidate = module_with_spec(&[]);
+
+            let report_a = analyze(&current, &candidate);
+            let report_b = analyze(&current, &candidate);
+            assert_eq!(
+                evidence_for(&report_a, "CONTRACT_INTERFACE_REMOVED"),
+                evidence_for(&report_b, "CONTRACT_INTERFACE_REMOVED")
+            );
+        }
     }
 }

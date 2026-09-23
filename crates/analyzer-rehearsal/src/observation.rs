@@ -2,10 +2,14 @@
 //!
 //! Every field here is bounded, canonical XDR-hex, or a small scalar;
 //! this module deliberately does not model an unrestricted execution
-//! trace (arbitrary host call log, full memory dump, and so on). A real
-//! execution backend (a later step) is responsible for enforcing the
-//! bound when it fills these types in; this module only defines the
-//! bounded shape.
+//! trace (arbitrary host call log, full memory dump, and so on). The
+//! real execution backend ([`crate::host`], built on `soroban-env-host`)
+//! is responsible for enforcing the bound when it fills these types in;
+//! this module only defines the bounded shape. See [`crate::host`]'s
+//! own docs for exactly which of these fields it currently fills in
+//! (`outcome` and `return_value_xdr_hex`) versus leaves at their
+//! default/empty value (`events`, `state_reads`, `state_writes`,
+//! `resource_usage`).
 
 use serde::{Deserialize, Serialize};
 
