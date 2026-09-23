@@ -239,6 +239,7 @@ pub fn run_upgrade_analysis(request: &AnalysisRequest) -> Result<AnalysisReport,
                 "events".to_string(),
                 "state".to_string(),
                 "authorization".to_string(),
+                "resource_usage".to_string(),
             ],
         })
     } else {
@@ -1316,6 +1317,48 @@ mod tests {
             evidence.source,
             EvidenceSource::MigrationManifest { .. }
         ));
+    }
+
+    #[test]
+    fn rehearsal_ran_report_lists_resource_usage_as_remaining_unverified() {
+        let current = write_wasm(MINIMAL_VALID);
+        let candidate = write_wasm(MINIMAL_VALID);
+        let rehearsal_input = analyzer_rehearsal::RehearsalInput {
+            current_executable: MINIMAL_VALID.to_vec(),
+            candidate_executable: MINIMAL_VALID.to_vec(),
+            state_snapshot: None,
+            invocations: vec![],
+            protocol_context: Some(28),
+            execution_limits: analyzer_rehearsal::ExecutionLimits::default(),
+            deterministic_seed: None,
+        };
+        let request = AnalysisRequest {
+            current_path: current.path(),
+            candidate_path: candidate.path(),
+            protocol_context: None,
+            migration_manifest: None,
+            analyzer_version: "0.1.0",
+            rehearsal_input: Some(&rehearsal_input),
+        };
+
+        let report = run_upgrade_analysis(&request).unwrap();
+        let rehearsal = report.rehearsal.expect("rehearsal was requested");
+        assert!(rehearsal.ran);
+        assert!(rehearsal
+            .observations_unavailable
+            .contains(&"resource_usage".to_string()));
+        assert!(
+            rehearsal
+                .remains_unverified
+                .contains(&"resource_usage".to_string()),
+            "remains_unverified should list resource_usage consistently with observations_unavailable: {:?}",
+            rehearsal.remains_unverified
+        );
+        assert!(rehearsal.remains_unverified.contains(&"events".to_string()));
+        assert!(rehearsal.remains_unverified.contains(&"state".to_string()));
+        assert!(rehearsal
+            .remains_unverified
+            .contains(&"authorization".to_string()));
     }
 
     mod interface_evidence_provenance {
