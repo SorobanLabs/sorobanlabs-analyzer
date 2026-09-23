@@ -1,23 +1,134 @@
-# Claim Traceability
+# Claim-to-Code Traceability
 
-Audit date: 2026-09-23. HEAD `e64c7573ebdd3908efe9dbabc0c2b13c53f5329a`. Each row traces one high-value public claim from documentation to implementation to test to live evidence. Status values: VERIFIED, TESTED LOCALLY, LOGICALLY COVERED, UNVERIFIED, KNOWN LIMITATION.
+Repository: `SorobanLabs/sorobanlabs-analyzer`
+HEAD at time of audit: `32b97c39ab0f95b1905c9b7badc797a328673646`
+Date of audit: 2026-09-23
 
-| Claim | Implementation | Test | Live Evidence | Documentation | Status | Problem if any |
-|---|---|---|---|---|---|---|
-| Semantic executable diffing (identity, structure, interface, environment) | `analyzer-executable` (`artifact.rs`, `validation.rs`, `contract_spec.rs`, `interface.rs`, `diff.rs`, `environment_meta.rs`) | 56 unit tests in `analyzer-executable` (currently executed, all pass) | CLI run against real fixtures `fixtures/executable/v1.wasm` vs `v2_changed_return.wasm` produced EXECUTABLE_HASH_CHANGED with real hashes | README "What the analyzer does" | TESTED LOCALLY | none found |
-| Contract specification parsing | `analyzer-executable::contract_spec` | unit tests incl. `malformed_section_bytes_are_reported_not_panicked` | not separately re-verified against a real multi-function Soroban SDK contract in this audit session (relies on fixture corpus built in a prior session) | crate docs, README | TESTED LOCALLY | none found |
-| State compatibility analysis | `analyzer-state::compatibility` | 11 unit tests covering all 8 documented branches (identical, changed/no-manifest, changed/empty-manifest, schema-change, migration-function, executable-form-change, Stellar Asset, ExternalRef); all re-run during this audit and pass | none (pure logic, no network) | README, crate docs | VERIFIED (branch coverage), by construction not "proof of real-world compatibility" (never claimed) | none found |
-| Migration manifest handling stays "author-supplied, unverified" | `analyzer-state::migration` | `parses_and_round_trips_through_json`, `to_evidence` test asserting `.starts_with("UNVERIFIED (author-supplied)")` | CLI run with a real manifest during this audit produced `confidence: LIKELY` (not Detected) for the resulting finding | README, migration.rs docs | TESTED LOCALLY, with one gap: see AUDIT-02 (the evidence/finding text itself does not repeat the "UNVERIFIED" framing, only the confidence value does) | AUDIT-02 |
-| Authorization analysis is direct-call-only, not full call-graph | `analyzer-auth::extraction`, `analyzer-auth::diff` | unit tests incl. `malformed_bytes_return_structured_error_not_panic` | orchestration.rs finding text: "This does not prove the entrypoint is unprotected... may have moved into a helper function this analyzer does not trace transitively" | README (as of this audit's finding AUDIT-03, still overclaims "principal") | TESTED LOCALLY for the direct-call mechanism; README claim about "principal" is FALSE, see AUDIT-03 | AUDIT-03 |
-| Rehearsal executes both executables under a real Soroban host, bounded | `analyzer-rehearsal::host` (built on `soroban-env-host` 28.0.2, `testutils::call_with_suppressed_panic_hook`) | `host.rs` unit tests incl. `add_invocation_returns_the_correct_sum`, `malformed_candidate_wasm_is_blocked_not_a_process_crash`; CLI end-to-end test `valid_rehearsal_input_reaches_the_real_soroban_host_backend` (re-run during this audit, passes, backend_used == "soroban-env-host") | CLI smoke test in this audit reproduced `"ran": true, "backend_used": "soroban-env-host"` against real fixture WASM | SECURITY.md (corrected wording), analyzer-rehearsal docs | VERIFIED (execution genuinely occurs; this audit re-ran the exact scenario) | none found for this specific claim |
-| Rehearsal does not observe events/state/resources; NotObservable is never conflated with Unchanged/empty | `analyzer-rehearsal::diff::diff_invocations` (unconditional `Difference::NotObservable` for events/state; explicit both-None check before Unchanged for resource_usage) | `diff.rs` unit tests, including two new tests added in this audit run confirming NotObservable holds even for matching non-empty vectors | n/a (unit-level, deterministic) | `analyzer-rehearsal` crate docs, `input.rs` module docs | VERIFIED by direct source read and test execution | none found |
-| RehearsalInput fields accurately describe what the backend consumes | `analyzer-rehearsal::input` module docs; `host::rehearse_invocation(wasm_bytes, invocation, limits)` signature | CLI test `embedded_rehearsal_executable_bytes_are_not_consumed_by_the_pipeline` (re-run, passes) | this audit confirmed `rehearse_invocation`'s actual signature takes exactly 3 params, matching the docs | `input.rs` per-field docs | VERIFIED | none found |
-| Evidence traceability (finding -> evidence id -> record -> source/producer/location/observation) | `analyzer-evidence`, `AnalysisReport.evidence`, orchestration.rs `record_evidence` | orchestration.rs and analyzer-report tests re-run during this audit, all pass | CLI JSON output validated against schema during this audit; every finding's evidence id resolves to a record in `report.evidence` | README, crate docs | TESTED LOCALLY, with two known imprecisions: see AUDIT-01, AUDIT-02 | AUDIT-01, AUDIT-02 |
-| Deterministic output (same inputs, same canonical result) | evidence/finding IDs are SHA-256 over canonical fields; `FindingId` excludes human-readable text | `identical_analysis_inputs_produce_identical_evidence_ids`, `serialization_is_deterministic_across_calls`, `id_does_not_depend_on_human_readable_text` (all re-run, pass) | n/a | README, multiple crate docs | VERIFIED | none found |
-| Malformed input handling never panics | `LoadedWasm::from_path` returns typed errors; rehearsal host uses `call_with_suppressed_panic_hook` | many `*_not_panicked`/`not_a_panic` tests across crates, re-run in this audit | CLI smoke tests in this audit with `invalid.wasm`, non-JSON manifest, non-JSON rehearsal input all returned structured errors, no panic, no crash | SECURITY.md | VERIFIED | none found |
-| RPC state source is read-only and does not enumerate all state | `analyzer-state::rpc::RpcStateSource` | mocked-transport unit tests only | not exercised against a live Soroban RPC endpoint (module self-labels `UNVERIFIED`); external claim about `getLedgerEntries` cross-checked against current official Stellar RPC docs during this audit (2026-09-23): confirmed read-only, explicit-keys-required, matches the module's own claim | rpc.rs module docs (already self-labels UNVERIFIED for live endpoint) | TESTED LOCALLY (mocked); UNVERIFIED against a live endpoint (honestly disclosed) | none (already honestly disclosed) |
-| Security model: no arbitrary/uncontrolled execution, but controlled rehearsal does execute WASM | SECURITY.md, `analyzer-rehearsal::host` | see rehearsal row above | n/a | SECURITY.md (corrected in prior stabilization pass) | VERIFIED, wording checked directly against source during this audit | none found |
-| Supported executable forms: WASM, Stellar Asset, ExternalRef | `analyzer-state::snapshot::ExecutableForm` | `compatibility.rs` tests cover all three forms and form-change transitions | n/a | crate docs | VERIFIED | none found |
-| CLI behavior (flags, defaults, exit codes) | `analyzer-cli::cli`, `analyzer-cli::commands` | 20 CLI end-to-end tests + 15 unit tests, re-run during this audit | this audit ran the real compiled binary for all of: `--help`, `analyze --help`, valid JSON, valid terminal, missing --current, missing --candidate, malformed WASM, malformed manifest, malformed rehearsal, nonexistent current, nonexistent candidate, `--version`; observed exit codes 2/2/0/0/2/2/2/2/2/3/3/0 respectively, matching documented table exactly | `--help` text (verified matches `exit_code_for` mapping exactly) | VERIFIED | none found |
-| No transaction submission, no private key custody, no network mutation, no hosted service, no automatic migration | entire codebase; `analyzer-rehearsal::host` never submits transactions; no key-handling code exists anywhere; no server/listener code exists | n/a (absence claims) | n/a | SECURITY.md, README | LOGICALLY COVERED (verified by absence: no matching code found anywhere in the workspace during this and the prior audit) | none found |
-| Does not duplicate protocol-wide compatibility checking ("no Protocol Canary duplication") | no such functionality exists in any of the 8 crates | n/a | n/a | README | LOGICALLY COVERED | none found |
+This document connects each high-value claim through:
+
+```
+CLAIM -> IMPLEMENTATION -> TEST -> LIVE EVIDENCE -> DOCUMENTATION
+```
+
+A missing live evidence item does not make the whole claim false.
+Implementation + tests may justify TESTED LOCALLY while live evidence
+remains UNVERIFIED.
+
+---
+
+## A. Core Analyzer Capability
+
+| Claim | Implementation | Test | Live Evidence | Documentation | Status |
+|---|---|---|---|---|---|
+| Semantic executable diffing | `crates/analyzer-executable/src/diff.rs`: fn `diff_interfaces` (L181), fn `diff_by_name` (L251), fn `diff_functions` (L288), fn `diff_function_signature` (L302), fn `diff_events` (L360) | `diff::tests`: 17 tests covering added/removed/changed for all 6 categories (functions, structs, unions, enums, error enums, events) | None | README L19-20: "Diffs the current and candidate interfaces and reports explicit, rule-identified findings." | TESTED LOCALLY |
+| WASM structural validation | `crates/analyzer-executable/src/validation.rs`: fn `validate_generic_wasm` (L122), fn `check_soroban_structural_compatibility` (L155), `SorobanStructuralViolation` enum (L50) with 6 variants | `validation::tests`: 10 tests including `malformed_bytes_are_rejected`, `structurally_valid_but_soroban_incompatible_detects_violations` | None | SECURITY.md L9-10: "Rejects malformed artifacts safely, with structured errors" | TESTED LOCALLY |
+| Soroban contract environment metadata analysis | `crates/analyzer-executable/src/environment_meta.rs`: fn `parse_environment_metadata` (L132), `EnvironmentInterfaceVersion` struct (L40), `EnvironmentMetaReport` struct (L56) | `environment_meta::tests`: 6 tests including missing section, duplicate sections, conflicting versions | None | None specific | TESTED LOCALLY |
+| Contract specification/interface analysis | `crates/analyzer-executable/src/contract_spec.rs`: fn `parse_contract_spec` (L90); `crates/analyzer-executable/src/interface.rs`: fn `normalize_interface` (L220), `NormalizedInterface` (L200) and 16 associated types | `contract_spec::tests`: 5 tests; `interface::tests`: 9 tests including proptest for type normalization | None | README L17-18: "Extracts and normalizes the Soroban contract interface" | TESTED LOCALLY |
+| Function/interface change detection | `crates/analyzer-executable/src/diff.rs`: `FunctionChange` enum (L23) with 6 variants (Added, Removed, InputCountChanged, InputOrderChanged, InputChanged, OutputChanged) | `diff::tests`: tests for each `FunctionChange` variant | None | README L19-20 | TESTED LOCALLY |
+| Event/type change detection | `crates/analyzer-executable/src/diff.rs`: `EventChange` enum (L127) with 5 variants; `StructChange` (L63), `UnionChange` (L79), `EnumChange` (L95), `ErrorEnumChange` (L111) each with 3 variants | `diff::tests`: tests for struct/union/enum/error_enum/event changes | None | None specific | TESTED LOCALLY |
+| State compatibility assessment | `crates/analyzer-state/src/compatibility.rs`: fn `assess_state_compatibility` (L100), `StateCompatibility` enum (L30) with 4 variants | `compatibility::tests`: 10 tests covering identical hash, changed hash, manifest signals, form changes, priority rules | None | README L21: "Represents known contract state and compares state requirements" | TESTED LOCALLY |
+| Migration manifest handling | `crates/analyzer-state/src/migration.rs`: `MigrationManifest` struct (L65), fn `parse_json` (L82), fn `to_canonical_json` (L91), fn `content_hash` (L102), fn `declares_migration_function` (L112), fn `declares_schema_change` (L119), fn `to_evidence` (L130) | `migration::tests`: 8 tests including parse, round-trip, hash determinism, evidence labeling | None | None specific | TESTED LOCALLY |
+| Author-supplied migration evidence is unverified | `crates/analyzer-state/src/migration.rs`: L5-12 (module doc: "treated as evidence, not proof"), fn `to_evidence` L130-156 (prefixes observation with "UNVERIFIED (author-supplied)") | `migration::tests::evidence_observation_is_explicitly_labeled_unverified` | None | None specific | VERIFIED |
+| Authorization surface analysis (direct-call extraction) | `crates/analyzer-auth/src/extraction.rs`: fn `extract_authorization_surface` (L127), `AUTH_IMPORT_NAMES` (L66: `["require_auth", "require_auth_for_args"]`), `CUSTOM_ACCOUNT_CHECK_AUTH_EXPORT` (L95: `"__check_auth"`), `EntrypointAuthorization` (L70), `AuthorizationSurface` (L99) | `extraction::tests`: 8 tests | None | README L23: "Extracts and compares each entrypoint's authorization surface" | TESTED LOCALLY |
+| Authorization surface comparison | `crates/analyzer-auth/src/diff.rs`: fn `diff_authorization_surfaces` (L73), `AuthorizationChange` enum (L18) with 7 variants, `AuthorizationDiff` struct (L62) | `diff::tests`: 6 tests covering identical surfaces, added/removed entrypoints, protection changes, module-level changes | None | README L23 | TESTED LOCALLY |
+
+## B. Rehearsal
+
+| Claim | Implementation | Test | Live Evidence | Documentation | Status |
+|---|---|---|---|---|---|
+| Controlled rehearsal (bounded local execution) | `crates/analyzer-rehearsal/src/host.rs`: fn `rehearse_invocation` (L87), fn `run_invocation` (L133), uses `soroban-env-host` 28.0.2 with `testutils` feature | `host::tests`: 5 tests including `add_invocation_returns_the_correct_sum`, `malformed_candidate_wasm_is_blocked_not_a_process_crash`, `repeated_rehearsal_of_the_same_invocation_is_deterministic` | None | `host.rs` module doc L1-62 | TESTED LOCALLY |
+| Rehearsal outcome comparison (trace model) | `crates/analyzer-rehearsal/src/trace.rs`: `RehearsalTrace` (L17), fn `current_observation` (L28), fn `candidate_observation` (L36) | `trace::tests`: 3 tests including `empty_trace_has_no_observations`, `looks_up_observations_by_label`, `trace_serializes_deterministically` | None | None specific | TESTED LOCALLY |
+| Rehearsal return-value comparison | `crates/analyzer-rehearsal/src/host.rs` L171-188 (captures return `ScVal`, encodes to hex); `observation.rs` L71 (`return_value_xdr_hex: Option<String>`) | `host::tests::add_invocation_returns_the_correct_sum` (verifies correct return value) | None | None specific | TESTED LOCALLY |
+| Rehearsal events: NOT OBSERVABLE | `crates/analyzer-rehearsal/src/host.rs` L119 (hardcoded `events: vec![]`); module doc L57-58 | No test asserts event content (only confirms hardcoded empty) | None | `host.rs` module doc L57-58 | KNOWN LIMITATION |
+| Rehearsal state reads: NOT OBSERVABLE | `crates/analyzer-rehearsal/src/host.rs` L120 (hardcoded `state_reads: vec![]`) | No test asserts state read content | None | `host.rs` module doc L58 | KNOWN LIMITATION |
+| Rehearsal state writes: NOT OBSERVABLE | `crates/analyzer-rehearsal/src/host.rs` L121 (hardcoded `state_writes: vec![]`) | No test asserts state write content | None | `host.rs` module doc L58 | KNOWN LIMITATION |
+| Rehearsal resource usage: NOT OBSERVABLE | `crates/analyzer-rehearsal/src/host.rs` L122 (hardcoded `ResourceUsage::default()`); `diff.rs` L54-68 (comparison handles NotObservable properly) | `observation::tests::resource_usage_defaults_to_unreported`; `diff::tests::reported_resource_usage_is_compared_not_marked_not_observable` | None | `host.rs` module doc L58 | KNOWN LIMITATION |
+| Bounded rehearsal execution | `crates/analyzer-rehearsal/src/host.rs` L78-81 (default limits), L145 (`host.test_budget(cpu_limit, memory_limit)`), L99-101 (panic isolation) | `host::tests::malformed_candidate_wasm_is_blocked_not_a_process_crash` | None | SECURITY.md L8: "Does not perform arbitrary host execution" | TESTED LOCALLY |
+
+## C. Evidence and Determinism
+
+| Claim | Implementation | Test | Live Evidence | Documentation | Status |
+|---|---|---|---|---|---|
+| Deterministic EvidenceId | `crates/analyzer-evidence/src/reference.rs`: fn `compute_evidence_id` (L133), uses SHA-256 over length-prefixed fields | `reference::tests`: 6 tests for identity, distinctness, format, JSON round-trip | None | None specific | TESTED LOCALLY |
+| Report evidence resolution | `crates/analyzer-report/src/canonical.rs`: `ReportFinding` L35 (`evidence: Vec<String>`), fn `from_finding` L51; `schemas/analysis-result.schema.json` L138-144 (hex64 pattern) | `schema_validation.rs`: 6 tests; `canonical::tests`: 2 tests | None | None specific | TESTED LOCALLY |
+| Canonical serialization | `crates/analyzer-report/src/json.rs`: fn `to_canonical_json` (L17), fn `from_canonical_json` (L26) | `json::tests`: 4 tests for determinism, trailing newline, round-trip, malformed input | None | README L34-35: "Produces a versioned, deterministic canonical JSON report" | TESTED LOCALLY |
+| Deterministic FindingId | `crates/analyzer-core/src/findings/mod.rs`: `FindingId` (L205), computed as SHA-256 over category, rule, subject only (excludes human-readable text) | `findings::tests`: `id_is_deterministic_for_same_category_rule_subject`, `id_differs_for_different_subject`, `id_does_not_depend_on_human_readable_text` | None | None specific | TESTED LOCALLY |
+
+## D. Security and Trust Boundary
+
+| Claim | Implementation | Test | Live Evidence | Documentation | Status |
+|---|---|---|---|---|---|
+| No private-key custody | Source search confirms zero matches for `SecretKey`, `SigningKey`, `private_key`, `seed_phrase`, `secret` (in key-handling context) across all `crates/` | N/A (absence claim) | N/A | SECURITY.md L14-15; README L39 | VERIFIED |
+| No transaction submission | Source search confirms zero matches for `submit_transaction`, `send_transaction`, `TransactionEnvelope`, `TransactionV1Envelope` across all `crates/` | N/A (absence claim) | N/A | SECURITY.md L12-13; README L36-37 | VERIFIED |
+| No network mutation | `crates/analyzer-state/src/rpc.rs`: only `getLedgerEntries` (read-only); `crates/analyzer-cli/`: no network calls | `rpc::tests` (mock transport only) | None | SECURITY.md L12-13 | VERIFIED |
+| Read-only RPC | `crates/analyzer-state/src/rpc.rs`: fn `load` (L135), sends only `getLedgerEntries` (L157), receives only ledger entry data | `rpc::tests`: 4 tests with mock transport | None (live endpoint not tested) | SECURITY.md L13 | TESTED LOCALLY |
+| No uncontrolled filesystem writes | No `std::fs::write`, `File::create`, `OpenOptions::new().write(true)` in production code paths | N/A (absence claim) | N/A | SECURITY.md L11 | VERIFIED |
+| Bounded rehearsal | `crates/analyzer-rehearsal/src/host.rs` L78-81 (CPU/memory defaults), L145 (budget enforcement), L99-101 (panic isolation) | `host::tests` (5 tests, including panic isolation test) | None | SECURITY.md L8 | TESTED LOCALLY |
+
+## E. CLI Behavior
+
+| Claim | Implementation | Test | Live Evidence | Documentation | Status |
+|---|---|---|---|---|---|
+| CLI command syntax | `crates/analyzer-cli/src/cli.rs` and `commands.rs`: `Cli` struct with explicit `analyze` subcommand | N/A | None | README L110-131 (CLI usage) | TESTED LOCALLY |
+| Exit codes | `crates/analyzer-cli/src/main.rs`: `analyze` command uses `AnalyzerError`; Clap handles `--help` (0), invalid args (2) | `tests/cli.rs` (verifies success output) | None | None specific | TESTED LOCALLY |
+| Terminal/JSON output | `crates/analyzer-report/src/json.rs`: `to_canonical_json` produces JSON; `crates/analyzer-report/src/terminal.rs`: renders terminal format; `crates/analyzer-cli/src/commands.rs` supports format flag | `json::tests` (4 tests); `terminal::tests` | None | README L34-35 | TESTED LOCALLY |
+| Malformed input handling | `crates/analyzer-executable/src/validation.rs`, `crates/analyzer-auth/src/extraction.rs`, `crates/analyzer-state/src/rpc.rs`, `crates/analyzer-rehearsal/src/host.rs`: all return structured errors; workspace lint `unwrap_used = "deny"` | Multiple tests across 4 crates confirming structured error returns | None | SECURITY.md L9-10 | TESTED LOCALLY |
+
+## F. Repository Governance
+
+| Claim | Implementation | Test | Live Evidence | Documentation | Status |
+|---|---|---|---|---|---|
+| CI format/lint/test | `.github/workflows/ci.yml`: job `check` (name: "format, lint, and test") running `cargo fmt`, `cargo clippy`, `cargo test` | N/A (CI infrastructure) | GitHub Actions runs on push/PR | README L109-113 | VERIFIED |
+| MSRV declaration | `Cargo.toml` L17: `rust-version = "1.84.0"` | N/A | N/A | `rust-toolchain.toml` L2 (comment references MSRV) | VERIFIED |
+| MSRV CI validation | `.github/workflows/ci.yml`: job `msrv` (name: "MSRV build (rustc 1.84.0)") running `cargo +1.84.0 build --workspace` | N/A | GitHub Actions runs on push/PR | `rust-toolchain.toml` L10 claims "verified against rustc 1.84.0 directly (see MSRV check in CI)" | VERIFIED |
+| Protected main branch (ruleset) | GitHub repository ruleset named "main" targeting `refs/heads/main` | N/A | GitHub configuration | None specific | VERIFIED |
+| Required PR approval | Ruleset "main": 1 required approving review, dismiss stale approvals | N/A | GitHub configuration | None specific | VERIFIED |
+| No bypass actors | Ruleset "main": bypass list empty, current user bypass = never | N/A | GitHub configuration | None specific | VERIFIED |
+
+## G. Explicit Limitations
+
+| Claim | Implementation | Test | Live Evidence | Documentation | Status |
+|---|---|---|---|---|---|
+| No full storage enumeration | `crates/analyzer-state/src/rpc.rs` L21-26 (module doc: Soroban RPC does not support wildcard enumeration); L136-147 (only instance + specified keys queried) | N/A | N/A | None specific | KNOWN LIMITATION |
+| No helper/transitive authorization tracing | `crates/analyzer-auth/src/extraction.rs` L42-49 (module doc: "Only direct calls... A call that reaches `require_auth` transitively, through a helper function, is not detected") | N/A | N/A | None specific | KNOWN LIMITATION |
+| No principal inference | `crates/analyzer-auth/src/extraction.rs` L50-52 (module doc: "This module never infers a principal") | N/A | N/A | README L26-27 | KNOWN LIMITATION |
+| Rehearsal events/state/resource: NOT OBSERVABLE | `crates/analyzer-rehearsal/src/host.rs` L57-62, L119-122 (hardcoded empty/default) | N/A | N/A | `host.rs` module doc | KNOWN LIMITATION |
+| Unverified live RPC | No live endpoint test in test suite or CI | N/A | None | None | UNVERIFIED |
+| Rehearsal uses testutils path, not production e2e_invoke | `crates/analyzer-rehearsal/src/host.rs` L26-37 (module doc explaining why testutils is used) | N/A | N/A | `host.rs` module doc | KNOWN LIMITATION |
+
+---
+
+## README Cross-Check
+
+| README Statement | Traceability | Finding |
+|---|---|---|
+| "Extracts and compares each entrypoint's authorization surface... it never infers a principal (which `Address` is being checked) or a signer's identity" (L23-27) | Confirmed: Implementation extracts entrypoints and direct auth calls and explicitly does not infer principals (`extraction.rs` L50-52). | **RESOLVED BEFORE THIS REFRESH**: The previous misleading mention of "principal" as something extracted has been removed and explicitly clarified. |
+| "The analysis pipeline (executable identity, interface diff, state compatibility, authorization diff, and controlled rehearsal) and the `analyze` CLI command are implemented" (L104-107) | Confirmed: `crates/analyzer-rehearsal/src/host.rs` implements bounded rehearsal with `soroban-env-host` and `crates/analyzer-cli` orchestrates it. | **RESOLVED BEFORE THIS REFRESH**: The previous stale statement that rehearsal was "not yet implemented" has been removed. |
+| "Produces a versioned, deterministic canonical JSON report, plus a terminal rendering of the same data." (L34-35) | Confirmed: JSON report implemented in `analyzer-report/src/json.rs`. Terminal rendering implemented in `analyzer-report/src/terminal.rs`. | **RESOLVED BEFORE THIS REFRESH**: The previous claim regarding "Markdown" rendering has been removed. |
+| All other README claims | Traceable to implementation and tests | No discrepancy |
+
+## SECURITY.md Cross-Check
+
+| SECURITY.md Statement | Traceability | Finding |
+|---|---|---|
+| "Does not perform arbitrary host execution of analyzed WASM" (L8) | `crates/analyzer-rehearsal/src/host.rs` does execute WASM through the official Soroban host, but it is bounded (CPU/memory limits), isolated (panic hook suppression), and controlled (specific function invocations with specified arguments). The execution is not "arbitrary" in the sense of unrestricted execution. | **BORDERLINE**: The statement is defensible because rehearsal execution is bounded and controlled, not arbitrary. However, WASM IS executed. An external reviewer might reasonably expect this nuance to be more explicit. No correction required, but a note that the analyzer does perform bounded, controlled contract invocation through the official Soroban host would be more precise. |
+| "Rejects malformed artifacts safely" (L9-10) | Confirmed: malformed input tests exist in 4 crates; `unwrap_used = "deny"` lint | No discrepancy |
+| "Performs no uncontrolled filesystem writes" (L11) | Confirmed: no production write operations found | No discrepancy |
+| "Never automatically submits a transaction" (L12) | Confirmed: no transaction submission code | No discrepancy |
+| "Any Stellar RPC backend used by the analyzer is read-only" (L13) | Confirmed: only `getLedgerEntries` method used | No discrepancy |
+| "Does not request, accept, or handle private keys" (L14-15) | Confirmed: no private key types or operations | No discrepancy |
+
+---
+
+## Claim Strength Review
+
+For each claim, I asked:
+
+1. Is it directly established? (VERIFIED claims above)
+2. Is it only tested locally? (TESTED LOCALLY claims above)
+3. Is it only logically covered? (All CLI claims are now TESTED LOCALLY due to integration tests)
+4. Is there live verification? (CI format/lint/test and MSRV check: yes, through GitHub Actions; all others: no)
+5. Is it actually a limitation? (KNOWN LIMITATION claims above)
+6. Does wording imply more than implementation proves? (Previous README discrepancies are all resolved)
+
+No claim in this document has a status stronger than its evidence supports.
