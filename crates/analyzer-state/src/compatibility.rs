@@ -106,13 +106,14 @@ pub fn assess_state_compatibility(
         if manifest.declares_migration_function() {
             return result(
                 StateCompatibility::RequiresMigration,
-                "migration manifest declares a migration function".to_string(),
+                "UNVERIFIED (author-supplied): migration manifest declares a migration function"
+                    .to_string(),
             );
         }
         if manifest.declares_schema_change() {
             return result(
                 StateCompatibility::RequiresMigration,
-                "migration manifest declares a schema version change with no migration function named"
+                "UNVERIFIED (author-supplied): migration manifest declares a schema version change with no migration function named"
                     .to_string(),
             );
         }

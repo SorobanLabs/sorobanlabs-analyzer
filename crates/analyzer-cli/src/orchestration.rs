@@ -1264,6 +1264,60 @@ mod tests {
         assert_eq!(overall_status(&[]), AnalysisStatus::NoDetectedBlockers);
     }
 
+    #[test]
+    fn migration_manifest_evidence_and_finding_preserve_unverified_framing() {
+        use analyzer_state::MigrationFunction;
+
+        let current = write_wasm(MINIMAL_VALID);
+        let candidate = write_wasm(&second_module());
+        let manifest = MigrationManifest {
+            migration_function: Some(MigrationFunction {
+                name: "migrate".to_string(),
+                one_time: true,
+            }),
+            ..Default::default()
+        };
+        let request = AnalysisRequest {
+            current_path: current.path(),
+            candidate_path: candidate.path(),
+            protocol_context: None,
+            migration_manifest: Some(&manifest),
+            analyzer_version: "0.1.0",
+            rehearsal_input: None,
+        };
+
+        let report = run_upgrade_analysis(&request).unwrap();
+        let finding = report
+            .findings
+            .iter()
+            .find(|f| f.rule == "MIGRATION_REQUIRED")
+            .expect("manifest declares a migration function");
+        assert_eq!(finding.confidence, "LIKELY");
+        assert!(
+            finding.detail.starts_with("UNVERIFIED (author-supplied)"),
+            "finding detail lost the unverified-author-supplied framing: {}",
+            finding.detail
+        );
+
+        let evidence_id = finding.evidence.first().unwrap();
+        let evidence = report
+            .evidence
+            .iter()
+            .find(|e| &e.id == evidence_id)
+            .expect("evidence resolves from the report");
+        assert!(
+            evidence
+                .observation
+                .starts_with("UNVERIFIED (author-supplied)"),
+            "evidence observation lost the unverified-author-supplied framing: {}",
+            evidence.observation
+        );
+        assert!(matches!(
+            evidence.source,
+            EvidenceSource::MigrationManifest { .. }
+        ));
+    }
+
     mod interface_evidence_provenance {
         use super::*;
         use stellar_xdr::{
