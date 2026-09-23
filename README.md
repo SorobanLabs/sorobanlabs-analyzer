@@ -20,12 +20,13 @@ an explicit confidence level.
   rule-identified findings.
 - Represents known contract state and compares state requirements
   between the current and candidate executables.
-- Extracts and compares the authorization surface (entrypoint,
-  authorization requirement, principal, check). This is limited to
-  *direct* calls to Soroban's authorization primitives from an
-  entrypoint's own function body; it does not trace calls through
-  helper functions, so "no direct call observed" is not the same
-  finding as "this entrypoint is unprotected".
+- Extracts and compares each entrypoint's authorization surface: which
+  authorization primitives, if any, it directly calls. This is limited
+  to *direct* calls from an entrypoint's own function body; it does not
+  trace calls through helper functions, and it never infers a
+  principal (which `Address` is being checked) or a signer's identity,
+  so "no direct call observed" is not the same finding as "this
+  entrypoint is unprotected".
 - When given a rehearsal manifest, runs the same invocations against both
   executables under a real, bounded Soroban host backend and reports
   observed behavioral differences (return value, execution outcome).
