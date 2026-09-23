@@ -52,6 +52,7 @@ dependencies = [
  "hex",
  "serde_json",
  "soroban-env-host",
+ "stellar-xdr",
  "tempfile",
 ]
 

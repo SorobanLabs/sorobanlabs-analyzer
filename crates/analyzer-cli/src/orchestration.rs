@@ -488,15 +488,32 @@ fn synthesize_interface_findings(
     let candidate_interface = normalize_interface(candidate_spec.entries())?;
     let diff = diff_interfaces(&current_interface, &candidate_interface);
 
-    // Every interface finding below is derived from the same
-    // comparison: the two executables' contractspecv0 sections.
-    let spec_evidence = |evidence: &mut EvidenceCollector, name: &str, observation: String| {
-        record_evidence(
-            evidence,
-            EvidenceSource::CustomWasmSection {
+    // Every interface finding below is derived from the two
+    // executables' contractspecv0 sections. Which side (or both) the
+    // evidence names must match which side the underlying fact is
+    // actually about: an "Added" fact only exists in the candidate's
+    // section, a "Removed" fact only in the current section, and a
+    // "Changed" fact requires comparing both.
+    let spec_evidence = |evidence: &mut EvidenceCollector,
+                         side: InterfaceEvidenceSide,
+                         name: &str,
+                         observation: String| {
+        let source = match side {
+            InterfaceEvidenceSide::Current => EvidenceSource::CustomWasmSection {
                 artifact_hash: current.hash().to_hex(),
                 section_name: "contractspecv0".to_string(),
             },
+            InterfaceEvidenceSide::Candidate => EvidenceSource::CustomWasmSection {
+                artifact_hash: candidate.hash().to_hex(),
+                section_name: "contractspecv0".to_string(),
+            },
+            InterfaceEvidenceSide::Both => EvidenceSource::DerivedComparison {
+                inputs: vec![current.hash().to_hex(), candidate.hash().to_hex()],
+            },
+        };
+        record_evidence(
+            evidence,
+            source,
             "analyzer-executable::diff",
             Some(name.to_string()),
             observation,
@@ -507,7 +524,12 @@ fn synthesize_interface_findings(
         match change {
             FunctionChange::Added { name } => {
                 let detail = format!("added function '{name}'");
-                let ev = spec_evidence(evidence, name, detail.clone());
+                let ev = spec_evidence(
+                    evidence,
+                    InterfaceEvidenceSide::Candidate,
+                    name,
+                    detail.clone(),
+                );
                 findings.push(interface_finding(
                     Rule::ContractInterfaceAdded,
                     name,
@@ -519,7 +541,12 @@ fn synthesize_interface_findings(
             }
             FunctionChange::Removed { name } => {
                 let detail = format!("removed function '{name}'");
-                let ev = spec_evidence(evidence, name, detail.clone());
+                let ev = spec_evidence(
+                    evidence,
+                    InterfaceEvidenceSide::Current,
+                    name,
+                    detail.clone(),
+                );
                 findings.push(interface_finding(
                     Rule::ContractInterfaceRemoved,
                     name,
@@ -535,7 +562,7 @@ fn synthesize_interface_findings(
                 candidate_count,
             } => {
                 let detail = format!("'{name}': {current_count} -> {candidate_count} inputs");
-                let ev = spec_evidence(evidence, name, detail.clone());
+                let ev = spec_evidence(evidence, InterfaceEvidenceSide::Both, name, detail.clone());
                 findings.push(interface_finding(
                     Rule::ContractSignatureChanged,
                     name,
@@ -547,7 +574,7 @@ fn synthesize_interface_findings(
             }
             FunctionChange::InputOrderChanged { name, .. } => {
                 let detail = format!("'{name}': input parameters reordered");
-                let ev = spec_evidence(evidence, name, detail.clone());
+                let ev = spec_evidence(evidence, InterfaceEvidenceSide::Both, name, detail.clone());
                 findings.push(interface_finding(
                     Rule::ContractSignatureChanged,
                     name,
@@ -559,7 +586,7 @@ fn synthesize_interface_findings(
             }
             FunctionChange::InputChanged { name, index, .. } => {
                 let detail = format!("'{name}': input at position {index} changed");
-                let ev = spec_evidence(evidence, name, detail.clone());
+                let ev = spec_evidence(evidence, InterfaceEvidenceSide::Both, name, detail.clone());
                 findings.push(interface_finding(
                     Rule::ContractSignatureChanged,
                     name,
@@ -571,7 +598,7 @@ fn synthesize_interface_findings(
             }
             FunctionChange::OutputChanged { name, .. } => {
                 let detail = format!("'{name}': return type changed");
-                let ev = spec_evidence(evidence, name, detail.clone());
+                let ev = spec_evidence(evidence, InterfaceEvidenceSide::Both, name, detail.clone());
                 findings.push(interface_finding(
                     Rule::ContractSignatureChanged,
                     name,
@@ -585,20 +612,34 @@ fn synthesize_interface_findings(
     }
 
     for change in &diff.event_changes {
-        let (name, summary) = match change {
-            EventChange::Added { name } => (name, "event added".to_string()),
-            EventChange::Removed { name } => (name, "event removed".to_string()),
-            EventChange::PrefixTopicsChanged { name, .. } => {
-                (name, "event prefix topics changed".to_string())
-            }
-            EventChange::ParametersChanged { name, .. } => {
-                (name, "event parameters changed".to_string())
-            }
-            EventChange::DataFormatChanged { name, .. } => {
-                (name, "event data format changed".to_string())
-            }
+        let (name, side, summary) = match change {
+            EventChange::Added { name } => (
+                name,
+                InterfaceEvidenceSide::Candidate,
+                "event added".to_string(),
+            ),
+            EventChange::Removed { name } => (
+                name,
+                InterfaceEvidenceSide::Current,
+                "event removed".to_string(),
+            ),
+            EventChange::PrefixTopicsChanged { name, .. } => (
+                name,
+                InterfaceEvidenceSide::Both,
+                "event prefix topics changed".to_string(),
+            ),
+            EventChange::ParametersChanged { name, .. } => (
+                name,
+                InterfaceEvidenceSide::Both,
+                "event parameters changed".to_string(),
+            ),
+            EventChange::DataFormatChanged { name, .. } => (
+                name,
+                InterfaceEvidenceSide::Both,
+                "event data format changed".to_string(),
+            ),
         };
-        let ev = spec_evidence(evidence, name, summary.clone());
+        let ev = spec_evidence(evidence, side, name, summary.clone());
         findings.push(interface_finding(
             Rule::ContractEventChanged,
             name,
@@ -610,13 +651,13 @@ fn synthesize_interface_findings(
     }
 
     for change in &diff.struct_changes {
-        let name = match change {
-            StructChange::Added { name }
-            | StructChange::Removed { name }
-            | StructChange::FieldsChanged { name, .. } => name,
+        let (name, side) = match change {
+            StructChange::Added { name } => (name, InterfaceEvidenceSide::Candidate),
+            StructChange::Removed { name } => (name, InterfaceEvidenceSide::Current),
+            StructChange::FieldsChanged { name, .. } => (name, InterfaceEvidenceSide::Both),
         };
         let detail = format!("struct '{name}' changed");
-        let ev = spec_evidence(evidence, name, detail.clone());
+        let ev = spec_evidence(evidence, side, name, detail.clone());
         findings.push(interface_finding(
             Rule::ContractTypeChanged,
             name,
@@ -627,13 +668,13 @@ fn synthesize_interface_findings(
         ));
     }
     for change in &diff.union_changes {
-        let name = match change {
-            UnionChange::Added { name }
-            | UnionChange::Removed { name }
-            | UnionChange::CasesChanged { name, .. } => name,
+        let (name, side) = match change {
+            UnionChange::Added { name } => (name, InterfaceEvidenceSide::Candidate),
+            UnionChange::Removed { name } => (name, InterfaceEvidenceSide::Current),
+            UnionChange::CasesChanged { name, .. } => (name, InterfaceEvidenceSide::Both),
         };
         let detail = format!("union '{name}' changed");
-        let ev = spec_evidence(evidence, name, detail.clone());
+        let ev = spec_evidence(evidence, side, name, detail.clone());
         findings.push(interface_finding(
             Rule::ContractTypeChanged,
             name,
@@ -644,13 +685,13 @@ fn synthesize_interface_findings(
         ));
     }
     for change in &diff.enum_changes {
-        let name = match change {
-            EnumChange::Added { name }
-            | EnumChange::Removed { name }
-            | EnumChange::CasesChanged { name, .. } => name,
+        let (name, side) = match change {
+            EnumChange::Added { name } => (name, InterfaceEvidenceSide::Candidate),
+            EnumChange::Removed { name } => (name, InterfaceEvidenceSide::Current),
+            EnumChange::CasesChanged { name, .. } => (name, InterfaceEvidenceSide::Both),
         };
         let detail = format!("enum '{name}' changed");
-        let ev = spec_evidence(evidence, name, detail.clone());
+        let ev = spec_evidence(evidence, side, name, detail.clone());
         findings.push(interface_finding(
             Rule::ContractTypeChanged,
             name,
@@ -661,13 +702,13 @@ fn synthesize_interface_findings(
         ));
     }
     for change in &diff.error_enum_changes {
-        let name = match change {
-            ErrorEnumChange::Added { name }
-            | ErrorEnumChange::Removed { name }
-            | ErrorEnumChange::CasesChanged { name, .. } => name,
+        let (name, side) = match change {
+            ErrorEnumChange::Added { name } => (name, InterfaceEvidenceSide::Candidate),
+            ErrorEnumChange::Removed { name } => (name, InterfaceEvidenceSide::Current),
+            ErrorEnumChange::CasesChanged { name, .. } => (name, InterfaceEvidenceSide::Both),
         };
         let detail = format!("error enum '{name}' changed");
-        let ev = spec_evidence(evidence, name, detail.clone());
+        let ev = spec_evidence(evidence, side, name, detail.clone());
         findings.push(interface_finding(
             Rule::ContractTypeChanged,
             name,
@@ -679,6 +720,16 @@ fn synthesize_interface_findings(
     }
 
     Ok(())
+}
+
+/// Which side of an interface comparison an evidence record's source
+/// should name, matching which side the underlying fact is actually
+/// about (see `synthesize_interface_findings`).
+#[derive(Clone, Copy)]
+enum InterfaceEvidenceSide {
+    Current,
+    Candidate,
+    Both,
 }
 
 fn interface_finding(
@@ -1211,5 +1262,177 @@ mod tests {
     #[test]
     fn overall_status_is_no_detected_blockers_for_empty_findings() {
         assert_eq!(overall_status(&[]), AnalysisStatus::NoDetectedBlockers);
+    }
+
+    mod interface_evidence_provenance {
+        use super::*;
+        use stellar_xdr::{
+            Limits, ScSpecEntry, ScSpecFunctionInputV0, ScSpecFunctionV0, ScSpecTypeDef, ScSymbol,
+            StringM, VecM, WriteXdr,
+        };
+
+        fn write_leb128(out: &mut Vec<u8>, mut value: u64) {
+            loop {
+                let byte = (value & 0x7f) as u8;
+                value >>= 7;
+                if value == 0 {
+                    out.push(byte);
+                    break;
+                }
+                out.push(byte | 0x80);
+            }
+        }
+
+        fn custom_section(name: &str, data: &[u8]) -> Vec<u8> {
+            let mut name_bytes = Vec::new();
+            write_leb128(&mut name_bytes, name.len() as u64);
+            name_bytes.extend_from_slice(name.as_bytes());
+
+            let mut content = name_bytes;
+            content.extend_from_slice(data);
+
+            let mut section = vec![0x00];
+            write_leb128(&mut section, content.len() as u64);
+            section.extend_from_slice(&content);
+            section
+        }
+
+        fn symbol(s: &str) -> ScSymbol {
+            ScSymbol(StringM::try_from(s).unwrap())
+        }
+
+        fn simple_function(name: &str) -> ScSpecEntry {
+            ScSpecEntry::FunctionV0(ScSpecFunctionV0 {
+                doc: StringM::default(),
+                name: symbol(name),
+                inputs: VecM::try_from(vec![ScSpecFunctionInputV0 {
+                    doc: StringM::default(),
+                    name: StringM::try_from("amount").unwrap(),
+                    type_: ScSpecTypeDef::I128,
+                }])
+                .unwrap(),
+                outputs: VecM::default(),
+            })
+        }
+
+        fn function_with_extra_input(name: &str) -> ScSpecEntry {
+            ScSpecEntry::FunctionV0(ScSpecFunctionV0 {
+                doc: StringM::default(),
+                name: symbol(name),
+                inputs: VecM::try_from(vec![
+                    ScSpecFunctionInputV0 {
+                        doc: StringM::default(),
+                        name: StringM::try_from("amount").unwrap(),
+                        type_: ScSpecTypeDef::I128,
+                    },
+                    ScSpecFunctionInputV0 {
+                        doc: StringM::default(),
+                        name: StringM::try_from("memo").unwrap(),
+                        type_: ScSpecTypeDef::I128,
+                    },
+                ])
+                .unwrap(),
+                outputs: VecM::default(),
+            })
+        }
+
+        fn module_with_spec(entries: &[ScSpecEntry]) -> Vec<u8> {
+            let mut data = Vec::new();
+            for entry in entries {
+                data.extend_from_slice(&entry.to_xdr(Limits::none()).unwrap());
+            }
+            let mut module = MINIMAL_VALID.to_vec();
+            module.extend_from_slice(&custom_section("contractspecv0", &data));
+            module
+        }
+
+        fn analyze(current_bytes: &[u8], candidate_bytes: &[u8]) -> AnalysisReport {
+            let current = write_wasm(current_bytes);
+            let candidate = write_wasm(candidate_bytes);
+            let request = AnalysisRequest {
+                current_path: current.path(),
+                candidate_path: candidate.path(),
+                protocol_context: None,
+                migration_manifest: None,
+                analyzer_version: "0.1.0",
+                rehearsal_input: None,
+            };
+            run_upgrade_analysis(&request).unwrap()
+        }
+
+        fn evidence_for(report: &AnalysisReport, rule: &str) -> analyzer_evidence::EvidenceSource {
+            let finding = report
+                .findings
+                .iter()
+                .find(|f| f.rule == rule)
+                .unwrap_or_else(|| panic!("no {rule} finding in report"));
+            let evidence_id = finding.evidence.first().expect("finding has evidence");
+            report
+                .evidence
+                .iter()
+                .find(|e| &e.id == evidence_id)
+                .expect("evidence resolves from the report")
+                .source
+                .clone()
+        }
+
+        #[test]
+        fn added_function_evidence_names_the_candidate_side() {
+            let current = module_with_spec(&[]);
+            let candidate = module_with_spec(&[simple_function("transfer")]);
+
+            let report = analyze(&current, &candidate);
+            let candidate_hash = report.candidate_executable.hash.clone();
+            match evidence_for(&report, "CONTRACT_INTERFACE_ADDED") {
+                EvidenceSource::CustomWasmSection { artifact_hash, .. } => {
+                    assert_eq!(artifact_hash, candidate_hash);
+                }
+                other => panic!("expected CustomWasmSection, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn removed_function_evidence_names_the_current_side() {
+            let current = module_with_spec(&[simple_function("transfer")]);
+            let candidate = module_with_spec(&[]);
+
+            let report = analyze(&current, &candidate);
+            let current_hash = report.current_executable.hash.clone();
+            match evidence_for(&report, "CONTRACT_INTERFACE_REMOVED") {
+                EvidenceSource::CustomWasmSection { artifact_hash, .. } => {
+                    assert_eq!(artifact_hash, current_hash);
+                }
+                other => panic!("expected CustomWasmSection, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn changed_signature_evidence_references_both_sides() {
+            let current = module_with_spec(&[simple_function("transfer")]);
+            let candidate = module_with_spec(&[function_with_extra_input("transfer")]);
+
+            let report = analyze(&current, &candidate);
+            let current_hash = report.current_executable.hash.clone();
+            let candidate_hash = report.candidate_executable.hash.clone();
+            match evidence_for(&report, "CONTRACT_SIGNATURE_CHANGED") {
+                EvidenceSource::DerivedComparison { inputs } => {
+                    assert_eq!(inputs, vec![current_hash, candidate_hash]);
+                }
+                other => panic!("expected DerivedComparison, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn interface_evidence_ids_are_deterministic() {
+            let current = module_with_spec(&[simple_function("transfer")]);
+            let candidate = module_with_spec(&[]);
+
+            let report_a = analyze(&current, &candidate);
+            let report_b = analyze(&current, &candidate);
+            assert_eq!(
+                evidence_for(&report_a, "CONTRACT_INTERFACE_REMOVED"),
+                evidence_for(&report_b, "CONTRACT_INTERFACE_REMOVED")
+            );
+        }
     }
 }
