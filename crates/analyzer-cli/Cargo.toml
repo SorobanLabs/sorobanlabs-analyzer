@@ -31,7 +31,7 @@ serde_json.workspace = true
 # Pinned transitively via proptest/rusty-fork to keep the resolved graph
 # on the 1.84.0 MSRV; newer tempfile releases pull in getrandom 0.4,
 # which requires edition2024.
-tempfile = "=3.14.0"
+tempfile = "=3.27.0"
 hex.workspace = true
 soroban-env-host.workspace = true
 stellar-xdr.workspace = true
