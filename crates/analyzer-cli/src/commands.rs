@@ -180,6 +180,16 @@ mod tests {
     }
 
     #[test]
+    fn analysis_stage_failure_maps_to_analysis_failure_exit_code() {
+        let err = AnalyzerError::from(analyzer_core::AnalysisError::new(
+            "internal analysis-stage failure",
+        ));
+        assert!(matches!(err, AnalyzerError::Analysis(_)));
+        assert_eq!(exit_code_for(&err), exit_code::ANALYSIS_FAILURE);
+        assert_eq!(exit_code::ANALYSIS_FAILURE, 5);
+    }
+
+    #[test]
     fn nonexistent_current_file_exits_with_backend_failure() {
         let mut out = Vec::new();
         let mut err = Vec::new();
