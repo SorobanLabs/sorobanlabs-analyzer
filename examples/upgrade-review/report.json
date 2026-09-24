@@ -1,0 +1,147 @@
+{
+    "schema_version": "1.0.0",
+    "analyzer_version": "0.1.0",
+    "protocol_context": null,
+    "current_executable": {
+        "hash": "cbcdd56cf60eb516d89ea55103ad7e5182b71351f98a9498a8740b25a706cabe",
+        "byte_length": 939
+    },
+    "candidate_executable": {
+        "hash": "d94fced32360e09f4081b36e834ef4a68cb3768d91b95e82b5f0d5e043bf88c5",
+        "byte_length": 1032
+    },
+    "status": "REVIEW_REQUIRED",
+    "rehearsal": {
+        "requested": false,
+        "ran": false,
+        "backend_used": null,
+        "observations_captured": [],
+        "observations_unavailable": [],
+        "behavioral_differences_established": [],
+        "remains_unverified": [
+            "all execution behavior"
+        ]
+    },
+    "evidence": [
+        {
+            "id": "a387f91aba594b49f0b5e5026066bcdf01e81930c7196e32816d6f648497f1e8",
+            "source": {
+                "kind": "derived_comparison",
+                "inputs": [
+                    "cbcdd56cf60eb516d89ea55103ad7e5182b71351f98a9498a8740b25a706cabe",
+                    "d94fced32360e09f4081b36e834ef4a68cb3768d91b95e82b5f0d5e043bf88c5"
+                ]
+            },
+            "producer": "analyzer-executable::artifact",
+            "location": null,
+            "observation": "current SHA-256 cbcdd56cf60eb516d89ea55103ad7e5182b71351f98a9498a8740b25a706cabe != candidate SHA-256 d94fced32360e09f4081b36e834ef4a68cb3768d91b95e82b5f0d5e043bf88c5"
+        },
+        {
+            "id": "cd58605ffba3e9d5db0f1ccb18502d5e2453de3d7950381db549320877fce9bc",
+            "source": {
+                "kind": "derived_comparison",
+                "inputs": [
+                    "cbcdd56cf60eb516d89ea55103ad7e5182b71351f98a9498a8740b25a706cabe",
+                    "d94fced32360e09f4081b36e834ef4a68cb3768d91b95e82b5f0d5e043bf88c5"
+                ]
+            },
+            "producer": "analyzer-executable::diff",
+            "location": "cause_error",
+            "observation": "'cause_error': return type changed"
+        },
+        {
+            "id": "c90cdb740f635e004b7a79ba26a8cae7c2789c6b9fb2eac61d0377aeaefa9141",
+            "source": {
+                "kind": "custom_wasm_section",
+                "artifact_hash": "d94fced32360e09f4081b36e834ef4a68cb3768d91b95e82b5f0d5e043bf88c5",
+                "section_name": "contractspecv0"
+            },
+            "producer": "analyzer-executable::diff",
+            "location": "Error",
+            "observation": "error enum 'Error' changed"
+        },
+        {
+            "id": "dcd43c90f3f8f8a4d1192ae0966f5b77ad04a28fbb071cf14f5f41bca52887e9",
+            "source": {
+                "kind": "derived_comparison",
+                "inputs": [
+                    "cbcdd56cf60eb516d89ea55103ad7e5182b71351f98a9498a8740b25a706cabe",
+                    "d94fced32360e09f4081b36e834ef4a68cb3768d91b95e82b5f0d5e043bf88c5"
+                ]
+            },
+            "producer": "analyzer-state::compatibility",
+            "location": null,
+            "observation": "no migration manifest was supplied, and this analyzer does not reconstruct a contract's storage layout from raw WASM; static storage-access compatibility cannot be established from this evidence alone"
+        }
+    ],
+    "findings": [
+        {
+            "id": "98a7a4fc60096970723e03f0bf575d04b888e378c33fae511980848dbfb88d04",
+            "category": "executable",
+            "rule": "EXECUTABLE_HASH_CHANGED",
+            "subject": "executable",
+            "summary": "candidate executable bytes differ from the current executable",
+            "detail": "current SHA-256 cbcdd56cf60eb516d89ea55103ad7e5182b71351f98a9498a8740b25a706cabe != candidate SHA-256 d94fced32360e09f4081b36e834ef4a68cb3768d91b95e82b5f0d5e043bf88c5",
+            "severity": "INFO",
+            "confidence": "DETECTED",
+            "evidence": [
+                "a387f91aba594b49f0b5e5026066bcdf01e81930c7196e32816d6f648497f1e8"
+            ],
+            "remediation": null
+        },
+        {
+            "id": "8845d2d3e4e6a03fb2bcf8f4ea119e22257385007fd69766a9342d8d736c37c4",
+            "category": "interface",
+            "rule": "CONTRACT_SIGNATURE_CHANGED",
+            "subject": "cause_error",
+            "summary": "function output type changed",
+            "detail": "'cause_error': return type changed",
+            "severity": "HIGH",
+            "confidence": "DETECTED",
+            "evidence": [
+                "cd58605ffba3e9d5db0f1ccb18502d5e2453de3d7950381db549320877fce9bc"
+            ],
+            "remediation": null
+        },
+        {
+            "id": "4d02ccd3ae09b9c122a581daaa61bb5d4925a1c2d0ae114afe8b825672d1afe0",
+            "category": "interface",
+            "rule": "CONTRACT_TYPE_CHANGED",
+            "subject": "Error",
+            "summary": "user-defined error enum type changed",
+            "detail": "error enum 'Error' changed",
+            "severity": "MEDIUM",
+            "confidence": "DETECTED",
+            "evidence": [
+                "c90cdb740f635e004b7a79ba26a8cae7c2789c6b9fb2eac61d0377aeaefa9141"
+            ],
+            "remediation": null
+        },
+        {
+            "id": "395881bf2d9ad090aed412368595dba049a7b7fa34dc2652aa83fe0480d9e7fd",
+            "category": "state",
+            "rule": "STATE_COMPATIBILITY_UNKNOWN",
+            "subject": "state",
+            "summary": "state compatibility could not be determined from available evidence",
+            "detail": "no migration manifest was supplied, and this analyzer does not reconstruct a contract's storage layout from raw WASM; static storage-access compatibility cannot be established from this evidence alone",
+            "severity": "INFO",
+            "confidence": "NOT_DETERMINABLE",
+            "evidence": [
+                "dcd43c90f3f8f8a4d1192ae0966f5b77ad04a28fbb071cf14f5f41bca52887e9"
+            ],
+            "remediation": null
+        },
+        {
+            "id": "adf85cddb9462e777885dd6a24defeeff997fe8afd36dc245c236e6f45b3d214",
+            "category": "rehearsal",
+            "rule": "REHEARSAL_FAILED",
+            "subject": "rehearsal",
+            "summary": "controlled rehearsal was not requested",
+            "detail": "the analysis pipeline was run without a rehearsal manifest; no observation about runtime behaviour differences between the current and candidate executables was made",
+            "severity": "INFO",
+            "confidence": "NOT_DETERMINABLE",
+            "evidence": [],
+            "remediation": null
+        }
+    ]
+}
