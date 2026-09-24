@@ -25,9 +25,11 @@ toml_edit = "=0.22.20"
 
 [dev-dependencies]
 proptest.workspace = true
-# Pinned transitively via proptest/rusty-fork to keep the resolved graph
-# on the 1.84.0 MSRV; newer tempfile releases pull in getrandom 0.4,
-# which requires edition2024.
+# Pinned to an exact version verified to build under the workspace's
+# 1.84.0 MSRV (see the msrv CI job). tempfile's transitive dependency
+# tree has pulled in getrandom releases that require edition2024 in
+# the past, so any bump here should be re-verified against 1.84.0
+# before updating the pin.
 tempfile = "=3.27.0"
 
 [lints]
