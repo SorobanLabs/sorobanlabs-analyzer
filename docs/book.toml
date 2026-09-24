@@ -1,0 +1,11 @@
+[book]
+title = "SorobanLabs Analyzer"
+description = "Documentation for the SorobanLabs Analyzer: what it analyzes when replacing a deployed Soroban contract's executable, how the analysis pipeline works, and how to run it."
+authors = ["SorobanLabs"]
+language = "en"
+src = "src"
+
+[output.html]
+git-repository-url = "https://github.com/SorobanLabs/sorobanlabs-analyzer"
+edit-url-template = "https://github.com/SorobanLabs/sorobanlabs-analyzer/edit/main/docs/{path}"
+default-theme = "light"
