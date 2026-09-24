@@ -1,11 +1,17 @@
 # Evidence Ledger
 
 Repository: `SorobanLabs/sorobanlabs-analyzer`
-HEAD at time of audit: `32b97c39ab0f95b1905c9b7badc797a328673646`
-Date of audit: 2026-09-23
+HEAD at time of last refresh: `bf8b28599f617269958552f35f7315daeff04a54`
+Date of last refresh: 2026-09-24
 
 This ledger records what an external reviewer can verify and from where.
 It is not a marketing document; it is a verification record.
+
+This is a refresh of the ledger originally created 2026-09-23 at HEAD
+`32b97c3`. Rows carried over unchanged keep their original Date Checked;
+only rows that were newly added or actually re-verified on 2026-09-24
+carry that date. No row was deleted; corrections to stale rows are
+recorded in their own Notes rather than by silently rewriting history.
 
 ## Evidence States
 
@@ -63,13 +69,13 @@ It is not a marketing document; it is a verification record.
 | # | Claim | Evidence Type | Source | What the Evidence Shows | Date Checked | Status | Notes |
 |---|---|---|---|---|---|---|---|
 | 24 | Malformed input handling | source, test | `crates/analyzer-executable/src/validation.rs` (returns `UnsupportedArtifactError`); `crates/analyzer-auth/src/extraction.rs` test `malformed_bytes_return_structured_error_not_panic`; `crates/analyzer-state/src/rpc.rs` test `malformed_response_body_is_a_structured_serialization_error`; `crates/analyzer-rehearsal/src/host.rs` test `malformed_candidate_wasm_is_blocked_not_a_process_crash`; workspace lint `unwrap_used = "deny"`, `expect_used = "deny"` | Malformed WASM, malformed JSON, malformed XDR, and malformed RPC responses all produce structured `AnalyzerError` variants rather than panics. Clippy lints deny `unwrap` and `expect` in production code. | 2026-09-23 | TESTED LOCALLY | |
-| 25 | CLI exit code behavior | source | `crates/analyzer-cli/src/main.rs` | CLI commands (`analyze` implementation) return structured errors. Clap automatically exits 0 on success/help/version and 2 on invalid arguments. | 2026-09-23 | TESTED LOCALLY | `analyze` command was implemented and tested. |
+| 25 | CLI exit code behavior | source, test | `crates/analyzer-cli/src/commands.rs` (`mod exit_code` L23-35: `SUCCESS = 0`, `INVALID_INPUT = 2`, `BACKEND_FAILURE = 3`, `ANALYSIS_FAILURE = 5`; fn `exit_code_for` L37-46 maps each `AnalyzerError` variant); tests in `commands.rs` asserting `exit_code::SUCCESS`, `INVALID_INPUT`, `BACKEND_FAILURE` | Exit codes are an explicit application-level mapping from `AnalyzerError` variants, not Clap's automatic argument-parsing behavior. `InvalidInput`/`UnsupportedArtifact`/`Configuration`/`Serialization` map to 2; `Backend` maps to 3; `Analysis` maps to 5; a completed analysis is always 0 regardless of the report's own `status` field. Matches README's documented exit code table exactly. | 2026-09-24 | VERIFIED | Corrected 2026-09-24: the prior row understated this as Clap's automatic 0/2 behavior and omitted the 3 and 5 codes, which are application logic, not Clap defaults. |
 
 ## E. Security and Trust Boundary
 
 | # | Claim | Evidence Type | Source | What the Evidence Shows | Date Checked | Status | Notes |
 |---|---|---|---|---|---|---|---|
-| 26 | Read-only RPC state source | source, test | `crates/analyzer-state/src/rpc.rs` (fn `load` L135; uses only `getLedgerEntries` JSON-RPC method, L157); tests: `rpc::tests` (4 tests with mock transport) | Only the `getLedgerEntries` method is called. No mutating RPC methods. HTTP POST with `Content-Type: application/json` only. | 2026-09-23 | TESTED LOCALLY | Tests use mock transport, not live endpoints. |
+| 26 | Read-only RPC state source (library capability) | source, test | `crates/analyzer-state/src/rpc.rs` (fn `load` L135; uses only `getLedgerEntries` JSON-RPC method, L157); tests: `rpc::tests` (4 tests with mock transport) | Only the `getLedgerEntries` method is called. No mutating RPC methods. HTTP POST with `Content-Type: application/json` only. | 2026-09-23 | TESTED LOCALLY | Tests use mock transport, not live endpoints. This describes the library module only; it is not reachable from the shipped CLI (see claim 51). |
 | 27 | RPC source does not enumerate complete contract state | source | `crates/analyzer-state/src/rpc.rs` L21-26 (module doc), L136-147 (implementation) | Soroban RPC `getLedgerEntries` requires exact key specification. Only the contract instance entry and caller-specified `DataKeyRequest` keys are queried. Module documentation explicitly states this does not hold a complete contract data footprint. | 2026-09-23 | KNOWN LIMITATION | Inherent Soroban RPC design constraint. |
 | 28 | Live RPC behavior remains unverified | manual observation | No live endpoint test exists in the test suite; all RPC tests use `MockTransport` | No test or CI step exercises a real Soroban RPC endpoint. The `UreqTransport` implementation exists but has not been verified against a live endpoint during this audit. | 2026-09-23 | UNVERIFIED | |
 | 29 | No private-key custody | source | Full repository search confirms zero matches for private keys | No private key types, arguments, storage, or operations exist anywhere in the codebase. | 2026-09-23 | VERIFIED | Confirmed by source search on 2026-09-23. |
@@ -102,17 +108,51 @@ It is not a marketing document; it is a verification record.
 |---|---|---|---|---|---|---|---|
 | 42 | Contract metadata parsing | source, test | `crates/analyzer-executable/src/contract_meta.rs` (fn `parse_contract_metadata` L121); tests: `contract_meta::tests` (5 tests) | Parses `contractmetav0` custom WASM sections. Decodes `ScMetaEntry` XDR to extract key-value pairs. Recognizes `rsver` (Rust version) and `rssdkver` (SDK version) keys. Reports decode errors without panicking. | 2026-09-23 | TESTED LOCALLY | |
 
+## I. Repository Identity, Legal, and Governance (Live State)
+
+| # | Claim | Evidence Type | Source | What the Evidence Shows | Date Checked | Status | Notes |
+|---|---|---|---|---|---|---|---|
+| 43 | Repository identity matches documentation | live GitHub, source | `gh api repos/SorobanLabs/sorobanlabs-analyzer`: `full_name: SorobanLabs/sorobanlabs-analyzer`, `visibility: public`, `default_branch: main`; `Cargo.toml` L19 (`repository = "https://github.com/SorobanLabs/sorobanlabs-analyzer"`) | Organization, repository name, visibility, and default branch all agree between live GitHub state and `Cargo.toml`. | 2026-09-24 | VERIFIED | |
+| 44 | License consistency | source, live GitHub | `LICENSE` (Apache License 2.0 text, "Copyright 2026 SorobanLabs" L178); `Cargo.toml` L18 (`license = "Apache-2.0"`, inherited by all 8 crates via `license.workspace = true`); `gh api .../repos/...` reports detected license `Apache-2.0` | LICENSE file, Cargo package metadata, and GitHub's own license detection all agree. No conflicting license reference found anywhere in README/CONTRIBUTING/SECURITY. | 2026-09-24 | VERIFIED | |
+| 45 | Repository description and topics match implementation | live GitHub | `gh api repos/SorobanLabs/sorobanlabs-analyzer`: `description` and `topics` fields | Description: "Rust analysis tool that determines what changes when replacing a deployed Soroban contract's executable...". Topics: `rust`, `cli`, `soroban`, `stellar`, `wasm`, `smart-contracts`. Each topic traced to concrete source evidence during the phase that set them (Rust edition/MSRV, `analyzer-cli`'s clap-based CLI, `stellar-xdr`/`soroban-env-host` dependencies, `wasmparser`-based WASM parsing, contract-upgrade domain). | 2026-09-24 | VERIFIED | |
+| 46 | Private vulnerability reporting is enabled | live GitHub | `gh api repos/SorobanLabs/sorobanlabs-analyzer/private-vulnerability-reporting` returns `{"enabled": true}` | SECURITY.md's instruction to "open a private security advisory on the repository" corresponds to an actually-enabled GitHub feature. This was previously disabled and was enabled directly to make the existing SECURITY.md sentence true. | 2026-09-24 | VERIFIED | Enabled 2026-09-24; previously `{"enabled": false}` on the same date before the change. |
+| 47 | Standalone repository topology | live GitHub | `gh api orgs/SorobanLabs/repos --paginate` returns exactly one repository (`sorobanlabs-analyzer` itself); `gh api repos/.../sorobanlabs-analyzer --jq '.fork, .parent, .source'` returns `false` with no parent/source | No other SorobanLabs repository exists. This repository is not a fork of, and has no repository forked from, anything. No product-peer repository exists to compare against. | 2026-09-24 | VERIFIED | |
+| 48 | Upstream dependency repositories are not product peers | source | `Cargo.toml` L38, L45, L67 (comments citing `stellar/rs-soroban-env` and `stellar/rs-stellar-xdr` for version-pinning justification only); `crates/analyzer-executable/src/validation.rs` L25; `crates/analyzer-rehearsal/src/host.rs` L14; `crates/analyzer-auth/src/extraction.rs` L16 | `stellar/rs-soroban-env` and `stellar/rs-stellar-xdr` are the upstream source of the pinned `soroban-env-host` and `stellar-xdr` crates. They are cited only as version-pinning/compatibility justification in code comments; no shared API, contract, deployment, or documentation surface exists between this repository and either. | 2026-09-24 | VERIFIED | Classified as upstream dependency reference, not a product peer. |
+| 49 | Open issue tracker represents real tracked work | live GitHub | `gh issue list --state all`: 3 open issues (#12, #13, #14), 0 closed | #12 tracks 8 of 23 unreachable `Rule` identifiers lacking documentation (see claim 50). #13 tracks 4 placeholder scaffold directories (`examples/`, `docs/`, `tests/`, `scripts/`). #14 tracks 3 Dependabot dependency bumps (clap, toml, ureq) blocked by the declared 1.84.0 MSRV. Each issue body was written directly from repository evidence, not invented. | 2026-09-24 | VERIFIED | |
+| 50 | v0.1.0 release and tag state | live GitHub | `gh api repos/.../releases/tags/v0.1.0`: `tag_name: v0.1.0`, `target_commitish: bf8b285...`, `draft: false`, `prerelease: false`; `gh api .../git/ref/tags/v0.1.0` confirms the tag object points to the same commit | The v0.1.0 tag and release exist, point to the same commit that is also current `main`, and the release is published (not draft or prerelease). The release body's Network and Deployment sections state no deployed network and no deployed contract IDs, matching Phase 22/25 findings. | 2026-09-24 | VERIFIED | The release body's Network section was corrected 2026-09-24 (see claim 51's CLI-reachability finding); the correction is reflected in the live release, not just this ledger. |
+
+## J. Deployment and Service Topology
+
+| # | Claim | Evidence Type | Source | What the Evidence Shows | Date Checked | Status | Notes |
+|---|---|---|---|---|---|---|---|
+| 51 | RPC module is not reachable from the CLI | source | `grep -rn "rpc::" crates/analyzer-cli/` returns no matches; `crates/analyzer-cli/src/cli.rs` (`AnalyzeArgs`, L57-87) has no RPC-related flag; `crates/analyzer-state/src/lib.rs` L20 publicly exports `rpc::{DataKeyRequest, RpcStateSource, Transport, UreqTransport}` | The read-only RPC state source (claim 26) exists and is tested as a library capability, but nothing in the shipped `sorobanlabs-analyzer` binary imports or invokes it. A user of the CLI cannot reach it through any flag, config file, or environment variable. Analysis runs entirely from local files. | 2026-09-24 | KNOWN LIMITATION | This distinction was missing from the v0.1.0 release notes as originally published; corrected 2026-09-24 (claim 50). |
+| 52 | No application runtime environment variables | source | Repository-wide search for `std::env`, `env::var`, and `.env` files across `crates/` returns no matches | No application code reads any environment variable. The only environment key present anywhere in the repository is `CARGO_TERM_COLOR: always` in `.github/workflows/ci.yml` L9, which is CI/tooling output formatting, not application configuration. | 2026-09-24 | VERIFIED | Absence confirmed by an actually-performed repository-wide search, not inferred from documentation. |
+| 53 | No public or private service endpoint | source | Repository-wide search for `TcpListener`, `bind(`, `axum`, `actix`, `warp`, `tonic`, `hyper::Server`, `tokio::net` across `crates/` returns no matches | No HTTP, REST, JSON-RPC, gRPC, or WebSocket server exists anywhere in the codebase. This is a CLI-only tool. | 2026-09-24 | VERIFIED | |
+| 54 | No application database | source | No database dependency (`postgres`, `sqlite`, `mysql`, `diesel`, `sqlx`, `rusqlite`) in `Cargo.toml` or any crate manifest | The analyzer holds no persistent application data store; all state is either a local input file or an in-memory `AnalysisReport`. | 2026-09-24 | VERIFIED | |
+| 55 | No wallet or signing boundary | source, doc | Repository-wide search for `SecretKey`, `sign(`, `Signature`, `private_key`, `SigningKey`, `Keypair` across `crates/` returns only unrelated matches (`ContractSignatureChanged`, a `Rule` name about WASM function signatures, not cryptographic signing); SECURITY.md L27-28 | No wallet integration, no signing key acceptance, no transaction submission exists anywhere. Consistent with claim 29 (no private-key custody) and claim 30 (no transaction submission). | 2026-09-24 | VERIFIED | |
+| 56 | No deployed service or hosting configuration | source | No `Dockerfile`, `docker-compose*`, or deployment/infra directory found anywhere in the repository; `.github/workflows/` contains only `ci.yml` (no deployment job) | No deployment infrastructure exists. Agrees with the Phase 22 release state and the corrected v0.1.0 release notes (claim 50). | 2026-09-24 | VERIFIED | |
+
+## K. Roadmap and Known-Gap Tracking
+
+| # | Claim | Evidence Type | Source | What the Evidence Shows | Date Checked | Status | Notes |
+|---|---|---|---|---|---|---|---|
+| 57 | 8 of 23 Rule identifiers are unreachable and undocumented as such | source, live GitHub | `crates/analyzer-core/src/findings/mod.rs` L139-169 (`Rule` enum, 23 variants); `schemas/analysis-result.schema.json` (`rule` enum, no reserved-value annotation); GitHub issue #12 | `StateSchemaChanged`, `RehearsalStateChanged`, `RehearsalEventChanged`, `RehearsalErrorChanged`, `RehearsalAuthorizationChanged`, `RehearsalResourceChanged`, `RehearsalObservationIncomplete`, and `ResourceUsageChanged` are defined but never constructed by any orchestration code path. Neither the enum's doc comments nor the schema currently say so. Tracked as real, outstanding, in-scope work in issue #12. | 2026-09-24 | KNOWN LIMITATION | Tracked by issue #12. |
+| 58 | Four scaffold directories remain placeholder-only | source, live GitHub | `find examples docs tests scripts -type f` returns only one `README.md` per directory; GitHub issue #13 | `examples/`, `docs/`, `tests/`, and `scripts/` each contain only a README describing content that is missing (`examples/`, `docs/`, `scripts/`) or that exists elsewhere than described (`tests/`: real tests exist under each crate's own `tests/` directory instead). Tracked in issue #13. | 2026-09-24 | KNOWN LIMITATION | Tracked by issue #13. |
+| 59 | Three Dependabot dependency bumps are blocked by the declared MSRV | live GitHub, CI | Closed PRs #6 (toml 0.9.6), #9 (ureq 3.4.2), #10 (clap 4.6.7), each failed the `msrv` CI job with "feature `edition2024` is required"; GitHub issue #14 | clap 4.6.7 and a toml 0.9.6 transitive dependency (`serde_spanned` 1.1.1) both directly require the `edition2024` Cargo feature, which rustc 1.84.0 cannot parse. ureq 3.4.2 additionally breaks the current `ureq::AgentBuilder` usage in `crates/analyzer-state/src/rpc.rs`. Tracked in issue #14 pending an MSRV policy decision. | 2026-09-24 | KNOWN LIMITATION | Tracked by issue #14. |
+
 ---
 
 ## Quality Checks Performed
 
-1. Every source path listed above exists in the repository at HEAD `32b97c3`.
-2. Every test name listed was confirmed by `cargo test --workspace` (226 tests, 0 failures, 2026-09-23).
-3. CI workflow job name "format, lint, and test" and "MSRV build (rustc 1.84.0)" match `.github/workflows/ci.yml` exactly.
-4. GitHub ruleset claims match the governance state provided for this audit.
+1. Every source path listed above exists in the repository at HEAD `32b97c3` (rows dated 2026-09-23) or `bf8b285` (rows dated 2026-09-24).
+2. Every test name listed was confirmed by `cargo test --workspace`. Re-run 2026-09-24 at HEAD `bf8b285`: 226 tests, 0 failures, same total as the 2026-09-23 count (no tests were added or removed between these two HEADs).
+3. CI workflow job names "format, lint, and test" and "MSRV build (rustc 1.84.0)" match `.github/workflows/ci.yml` exactly, and both were re-confirmed as live `success` check runs on HEAD `bf8b285` on 2026-09-24.
+4. GitHub ruleset claims (claims 39-41) were re-read live on 2026-09-24 and are unchanged since 2026-09-23.
 5. No duplicate claims with conflicting statuses exist.
 6. No claim has a status stronger than its evidence supports.
-7. No invented deployment, Testnet, or live network data exists in this ledger.
-8. No claim has been marked VERIFIED solely because documentation says so.
-9. KNOWN LIMITATION entries all reflect explicitly documented scope boundaries in source code.
+7. No invented deployment, Testnet, live network, contract ID, or transaction hash data exists in this ledger.
+8. No claim has been marked VERIFIED solely because documentation says so; absence claims (sections I-K) were confirmed by an actually-performed search or live API call, not inferred from README wording.
+9. KNOWN LIMITATION entries all reflect explicitly documented scope boundaries in source code or an actual open GitHub issue.
 10. UNVERIFIED entries identify claims that cannot be established from current evidence.
+11. The RPC-reachability distinction (library capability vs. CLI-reachable, claims 26 and 51) is stated explicitly so the ledger cannot be read as implying the CLI exposes network configuration.
+12. This 2026-09-24 refresh was cross-checked against `audit/claim-traceability.md`; that document was not modified in this refresh (see the Phase 26 report's traceability cross-check for identified gaps, deferred to Phase 27).
