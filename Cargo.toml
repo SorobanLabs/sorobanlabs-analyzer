@@ -61,7 +61,7 @@ stellar-xdr = { version = "=28.0.0", features = ["base64"] }
 # written); the resolved `idna` crate itself (1.1.0) is well above the
 # version RUSTSEC-2024-0421 was fixed in (1.0.3), so no known
 # vulnerability is reintroduced by these two pins.
-ureq = "=2.12.1"
+ureq = "=3.4.2"
 # soroban-env-host 28.0.2 is the released version matching stellar-xdr
 # 28.0.0 and wasmparser 0.116.1 exactly (verified against
 # https://github.com/stellar/rs-soroban-env/blob/v28.0.2/Cargo.toml,
