@@ -2,10 +2,21 @@
 
 Audit date: 2026-09-23. Repository: SorobanLabs/sorobanlabs-analyzer, branch main, HEAD `e64c7573ebdd3908efe9dbabc0c2b13c53f5329a`. All evidence below was directly observed in this repository's source, tests, or the live GitHub repository during this audit; no result is inferred from intent or from a prior report.
 
+This document is a point-in-time snapshot dated 2026-09-23 at the HEAD
+above. It is not re-run automatically and is not the current claim
+surface. `evidence/index.md` and `audit/claim-traceability.md` are the
+current, actively maintained record of what is verified true today;
+consult those first. Each finding below now carries a `resolution`
+line stating its actual current status as of this correction
+(2026-09-24), so this document does not present a fixed finding as
+still open. The original finding text is preserved unchanged below the
+resolution line for historical record.
+
 Classification key: A = Blocker, B = Stale/Cosmetic, C = Known Limitation, D = Important Pre-Submission Fix, E = Non-Blocking Backlog.
 
 ## AUDIT-01
 
+- resolution: RESOLVED 2026-09-23 by commit `93cfaf7` (fix(cli): correct interface evidence provenance). Interface evidence now names the correct side per change direction (candidate for Added, current for Removed, both for Changed via `DerivedComparison`), with regression tests. See `evidence/index.md` claims 1-6 and `audit/claim-traceability.md` section A.
 - classification: D
 - title: Interface-finding evidence source always cites the current executable, even for facts about the candidate
 - affected area: `crates/analyzer-cli/src/orchestration.rs`, `synthesize_interface_findings`'s `spec_evidence` closure
@@ -17,6 +28,7 @@ Classification key: A = Blocker, B = Stale/Cosmetic, C = Known Limitation, D = I
 
 ## AUDIT-02
 
+- resolution: RESOLVED 2026-09-23 by commit `05e0b5a` (fix(state): preserve manifest evidence provenance). Both the finding detail and evidence observation now carry the literal `UNVERIFIED (author-supplied):` prefix for manifest-derived reasons. See `evidence/index.md` claim 9 and `audit/claim-traceability.md` section A.
 - classification: D
 - title: Manifest-derived state-compatibility evidence loses the "UNVERIFIED (author-supplied)" framing
 - affected area: `crates/analyzer-cli/src/orchestration.rs`, `synthesize_state_findings`; contrast with `crates/analyzer-state/src/migration.rs`, `MigrationManifest::to_evidence`
@@ -28,6 +40,7 @@ Classification key: A = Blocker, B = Stale/Cosmetic, C = Known Limitation, D = I
 
 ## AUDIT-03
 
+- resolution: RESOLVED 2026-09-23 by commit `55ea097` (docs(auth): correct authorization principal claim). README's authorization bullet no longer claims principal extraction and explicitly states principal/signer identity is never inferred. See `audit/claim-traceability.md` section G.
 - classification: D
 - title: README's authorization bullet claims "principal" is extracted, which the extractor explicitly does not do
 - affected area: `README.md` line 24; `crates/analyzer-auth/src/extraction.rs`
@@ -39,6 +52,7 @@ Classification key: A = Blocker, B = Stale/Cosmetic, C = Known Limitation, D = I
 
 ## AUDIT-04
 
+- resolution: RESOLVED 2026-09-23 by commit `d26cbe8` (ci: validate declared Rust MSRV). `.github/workflows/ci.yml` now has an `msrv` job ("MSRV build (rustc 1.84.0)") that installs rustc 1.84.0 and runs `cargo +1.84.0 build --workspace`; this check is required by the branch ruleset and passes live. See `evidence/index.md` claim 37 and `audit/claim-traceability.md` section F.
 - classification: D
 - title: rust-toolchain.toml claims an MSRV check exists in CI; it does not
 - affected area: `rust-toolchain.toml` (comment), `.github/workflows/ci.yml`
@@ -50,6 +64,7 @@ Classification key: A = Blocker, B = Stale/Cosmetic, C = Known Limitation, D = I
 
 ## AUDIT-05
 
+- resolution: RESOLVED 2026-09-24 by commit `22eb282` (docs(contributing): correct stale CI claim and add missing contributor sections, PR #11). CONTRIBUTING.md no longer describes schema validation/determinism tests as future work; it now states they run as part of `cargo test --workspace`.
 - classification: B
 - title: CONTRIBUTING.md describes JSON schema validation and determinism tests as future work; both already exist and already run
 - affected area: `CONTRIBUTING.md`
@@ -72,6 +87,7 @@ Classification key: A = Blocker, B = Stale/Cosmetic, C = Known Limitation, D = I
 
 ## AUDIT-07
 
+- resolution: STILL OPEN as of 2026-09-24. Now formally tracked as GitHub issue #13 ("Populate or correct placeholder scaffold directories"), which also extends this finding to `tests/` and `scripts/` (not originally covered here). Not resolved by this correction pass; do not treat this finding as fixed.
 - classification: B
 - title: examples/ and docs/ directories contain only placeholder READMEs describing content that does not exist yet
 - affected area: `examples/README.md`, `docs/README.md`
@@ -83,6 +99,7 @@ Classification key: A = Blocker, B = Stale/Cosmetic, C = Known Limitation, D = I
 
 ## AUDIT-08
 
+- resolution: STILL OPEN as of 2026-09-24. Now formally tracked as GitHub issue #12 ("Document which Rule identifiers are currently unreachable"). Not resolved by this correction pass; do not treat this finding as fixed.
 - classification: C
 - title: 8 of 23 `Rule` identifiers are defined (in code and in the JSON schema) but never produced
 - affected area: `crates/analyzer-core/src/findings/mod.rs` (`Rule` enum), `schemas/analysis-result.schema.json` (`rule` enum), `crates/analyzer-cli/src/orchestration.rs` (actual production sites)
@@ -94,6 +111,7 @@ Classification key: A = Blocker, B = Stale/Cosmetic, C = Known Limitation, D = I
 
 ## AUDIT-09
 
+- resolution: RESOLVED 2026-09-23 by commit `32b97c3` (fix(rehearsal): report resource usage as unobservable). `remains_unverified` now includes `resource_usage` alongside `events`, `state`, and `authorization`. See `evidence/index.md` claim 19 and `audit/claim-traceability.md` section B.
 - classification: D
 - title: `remains_unverified` omits "resource_usage" even though `observations_unavailable` includes it
 - affected area: `crates/analyzer-cli/src/orchestration.rs`, the `Some(analyzer_report::ReportRehearsal { ... })` construction for the "rehearsal ran" branch
@@ -105,6 +123,7 @@ Classification key: A = Blocker, B = Stale/Cosmetic, C = Known Limitation, D = I
 
 ## AUDIT-10
 
+- resolution: RESOLVED 2026-09-24 via live GitHub repository metadata (description and topics `rust`, `cli`, `soroban`, `stellar`, `wasm`, `smart-contracts` set directly; not a source commit). See `evidence/index.md` claim 45.
 - classification: E
 - title: GitHub repository metadata is minimal (no description, no topics, no homepage)
 - affected area: GitHub repository settings (not source-controlled)
