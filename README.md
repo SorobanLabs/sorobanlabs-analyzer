@@ -7,9 +7,11 @@ specific question:
 > contract?
 
 The analyzer determines what can be established from the available
-executable, contract interface, state, authorization surface, protocol
-context, and controlled execution evidence, and reports each finding with
-an explicit confidence level.
+executable, contract interface, state, authorization surface, and
+controlled execution evidence, and reports each finding with an explicit
+confidence level. A caller-supplied protocol number is recorded in the
+report for context; it is not yet compared against observed environment
+interface versions.
 
 ## What the analyzer does
 
@@ -93,10 +95,18 @@ crates/
                        all depend on analyzer-core
 fixtures/    declarative fixtures used by the test suite
 schemas/     versioned JSON schemas for canonical output
-examples/    example inputs and outputs
-docs/        additional documentation
-tests/       workspace-level integration tests
-scripts/     development and CI helper scripts
+audit/       point-in-time audit reports (see each file's own date
+             and HEAD before relying on it; evidence/index.md and
+             audit/claim-traceability.md are the current, maintained
+             claim surface)
+evidence/    the current claim-to-evidence ledger (evidence/index.md)
+examples/    placeholder: no example inputs/outputs exist yet (#13)
+docs/        placeholder: no additional documentation exists yet (#13)
+tests/       placeholder at this path: real workspace integration,
+             schema, and determinism tests exist under each crate's
+             own tests/ directory instead (#13)
+scripts/     placeholder: no development or CI helper scripts exist
+             yet (#13)
 ```
 
 ## Status
