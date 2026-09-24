@@ -1,9 +1,20 @@
-# Final Technical Audit
+# Final Technical Audit (2026-09-23 snapshot, superseded)
 
 Date: 2026-09-23
 Repository: SorobanLabs/sorobanlabs-analyzer
 Branch: main
 HEAD audited: `e64c7573ebdd3908efe9dbabc0c2b13c53f5329a`
+
+**This document is a point-in-time snapshot, not the current audit
+state.** Despite its title, it is not the final word on this
+repository: five of the ten findings it describes below as open
+(AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, AUDIT-09) were fixed the same
+day this audit was written, and a sixth (AUDIT-05) was fixed the
+following day. See `finding-matrix.md` for the per-finding resolution
+status, and see `evidence/index.md` and `claim-traceability.md` for
+the current, actively maintained claim surface; those two documents,
+not this one, are what a reviewer should treat as authoritative for
+current state.
 
 This audit was performed without changing product implementation. No source file under `crates/` was modified. The only changes made during this audit are this `audit/` directory itself.
 
@@ -25,10 +36,12 @@ Where a claim could not be checked from within this environment (chiefly: live S
 
 Ten findings, detailed in `finding-matrix.md` (IDs AUDIT-01 through AUDIT-10): none classified Blocker, five classified Important Pre-Submission Fix (interface-finding evidence source imprecision; manifest-evidence losing its "unverified" framing in text; a false "principal" extraction claim in README; a false "MSRV checked in CI" claim; a rehearsal-coverage internal inconsistency omitting resource_usage from `remains_unverified`), four classified Stale/Cosmetic (two CONTRIBUTING.md statements, two placeholder-only directories), one classified Known Limitation (unreachable Rule identifiers), one classified Non-Blocking Backlog (GitHub repository metadata). None of these were present in, or contradict, the prior stabilization report's claims about what it fixed; they are new findings from re-reading the actual current source with fresh eyes, per this audit's explicit charge not to rely on the prior report where it could be checked against the repository.
 
+**Current status as of 2026-09-24 (see `finding-matrix.md` for full detail): AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, AUDIT-05, and AUDIT-10 are resolved. AUDIT-06 remains an accepted known limitation requiring no action. AUDIT-07 and AUDIT-08 remain open and are now tracked as GitHub issues #13 and #12 respectively.** None of the ten findings were ever classified Blocker; none changed the analyzer's actual behavior while open.
+
 ## What this audit did not attempt
 
 No product code was changed. No dependency was upgraded. No new test infrastructure, state execution engine, resource accounting, or event capture was added. No git history was rewritten (the rewrite audited here was performed and pushed in the prior session, before this audit began). No later-phase submission artifacts (release, documentation site, external reviewer sign-off) were created, since none were requested and creating them was out of scope for an audit.
 
 ## Conclusion
 
-This repository, at `e64c757`, builds, tests, and lints cleanly, and its highest-value claims (deterministic output, evidence traceability, honestly-scoped rehearsal, honestly-scoped authorization analysis, no transaction/key/network-mutation capability) hold under direct, current verification. It also contains ten concrete, real defects in documentation and evidence-source precision, none of which change the analyzer's actual behavior and none of which were found to be a blocker to further review. No claim in this document should be read as "production ready," "fully complete," "safe," or "fully verified"; those terms are not supported by, and are deliberately absent from, this audit's evidence.
+This repository, at `e64c757`, builds, tests, and lints cleanly, and its highest-value claims (deterministic output, evidence traceability, honestly-scoped rehearsal, honestly-scoped authorization analysis, no transaction/key/network-mutation capability) hold under direct, current verification. It also contains ten concrete, real defects in documentation and evidence-source precision, none of which change the analyzer's actual behavior and none of which were found to be a blocker to further review. Six of the ten (AUDIT-01, 02, 03, 04, 05, 10) have since been resolved; see the banner at the top of this document and `finding-matrix.md` for current status. No claim in this document should be read as "production ready," "fully complete," "safe," or "fully verified"; those terms are not supported by, and are deliberately absent from, this audit's evidence.
