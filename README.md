@@ -4,6 +4,17 @@
   <img src="assets/Sorobanlabs-analyzer.svg" alt="SorobanLabs Analyzer banner">
 </p>
 
+<p align="center">
+  <a href="https://github.com/SorobanLabs/sorobanlabs-analyzer/actions/workflows/ci.yml"><img src="https://github.com/SorobanLabs/sorobanlabs-analyzer/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
+  <a href="rust-toolchain.toml"><img src="https://img.shields.io/badge/MSRV-1.84.0-orange.svg" alt="Minimum supported Rust version 1.84.0"></a>
+  <a href="https://github.com/SorobanLabs/sorobanlabs-analyzer/releases/tag/v0.1.0"><img src="https://img.shields.io/github/v/release/SorobanLabs/sorobanlabs-analyzer" alt="Latest release"></a>
+</p>
+
+<p align="center">
+  <a href="https://sorobanlabs.github.io/sorobanlabs-analyzer/">Documentation</a>
+</p>
+
 SorobanLabs Analyzer is a Rust-first analysis tool that answers one
 specific question:
 
@@ -104,14 +115,19 @@ audit/       point-in-time audit reports (see each file's own date
              audit/claim-traceability.md are the current, maintained
              claim surface)
 evidence/    the current claim-to-evidence ledger (evidence/index.md)
-examples/    placeholder: no example inputs/outputs exist yet (#13)
-docs/        placeholder: no additional documentation exists yet (#13)
+examples/    real, runnable examples (see examples/README.md)
+docs/        source for the published documentation book (see below)
 tests/       placeholder at this path: real workspace integration,
              schema, and determinism tests exist under each crate's
              own tests/ directory instead (#13)
 scripts/     placeholder: no development or CI helper scripts exist
              yet (#13)
 ```
+
+`examples/` and `docs/` are populated; `tests/` and `scripts/` remain
+intentionally empty placeholders (each README says exactly why). See
+[issue #13](https://github.com/SorobanLabs/sorobanlabs-analyzer/issues/13)
+for the current state of this work.
 
 ## Status
 
@@ -149,7 +165,16 @@ report's own `status` field (which may be `NO_DETECTED_BLOCKERS`,
 `REVIEW_REQUIRED`, `MIGRATION_REQUIRED`, or `INCONCLUSIVE`); a non-zero
 code means the CLI itself could not complete (invalid input, a missing
 or unreadable file, or an internal analysis failure). Run
-`sorobanlabs-analyzer --help` for the full table.
+`sorobanlabs-analyzer --help` for the full table, or see the
+[CLI reference](https://sorobanlabs.github.io/sorobanlabs-analyzer/cli.html)
+in the documentation.
+
+## Example
+
+See [`examples/upgrade-review`](examples/upgrade-review/) for a real,
+runnable example: two real fixture executables, the exact command, and
+the actual captured terminal and JSON output, with an explanation of
+each finding.
 
 ## Development setup
 
@@ -172,6 +197,24 @@ cargo clippy --workspace --all-targets -- -D warnings
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more detail and
 [SECURITY.md](SECURITY.md) for the project's security posture.
+
+## Documentation
+
+The full documentation book is published at
+[sorobanlabs.github.io/sorobanlabs-analyzer](https://sorobanlabs.github.io/sorobanlabs-analyzer/),
+built from [`docs/`](docs/).
+
+## Maintainer & community
+
+**Maintainer:** [@Hollujay](https://github.com/Hollujay) —
+reachable via this repository's GitHub profile, or on Telegram at
+[@Hollujay21](https://t.me/Hollujay21). No other official contact
+channel is published for this project.
+
+**Community:** there is no dedicated community channel yet.
+Contribution and discussion happen through GitHub
+[issues](https://github.com/SorobanLabs/sorobanlabs-analyzer/issues)
+and pull requests on this repository.
 
 ## License
 
