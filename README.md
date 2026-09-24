@@ -1,5 +1,9 @@
 # SorobanLabs Analyzer
 
+<p align="center">
+  <img src="assets/Sorobanlabs-analyzer.svg" alt="SorobanLabs Analyzer banner">
+</p>
+
 SorobanLabs Analyzer is a Rust-first analysis tool that answers one
 specific question:
 
