@@ -32,7 +32,7 @@ thiserror = "=2.0.20"
 sha2 = "=0.10.9"
 toml = "=0.8.19"
 hex = "=0.4.3"
-clap = { version = "=4.5.20", features = ["derive"] }
+clap = { version = "=4.6.7", features = ["derive"] }
 proptest = "=1.11.0"
 # Pinned to the exact version the official rs-soroban-env workspace
 # pins (https://github.com/stellar/rs-soroban-env/blob/main/Cargo.toml,
