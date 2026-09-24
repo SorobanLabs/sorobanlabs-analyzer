@@ -12,6 +12,20 @@ line stating its actual current status as of this correction
 still open. The original finding text is preserved unchanged below the
 resolution line for historical record.
 
+## Identifier traceability note (2026-09-24)
+
+The findings below are numbered `AUDIT-01` through `AUDIT-10`. A
+separate, external Phase 30 report referenced findings numbered
+`RSIM-01` through `RSIM-07` and `FTA-01` through `FTA-03`. Only
+`RSIM-01`, `RSIM-02`, `RSIM-03`, `RSIM-04`, and `FTA-03` are actually
+represented in this repository's history (see commit `8bf3558` and
+pull requests #17, #18, and #19). `RSIM-05`, `RSIM-06`, `RSIM-07`,
+`FTA-01`, and `FTA-02` do not correspond to any finding, commit, pull
+request, or issue in this repository as of this note. This gap is
+recorded here as a factual discrepancy between the Phase 30 report and
+this repository's actual audit trail; it is not resolved by inventing
+matching findings, and no such findings have been added.
+
 Classification key: A = Blocker, B = Stale/Cosmetic, C = Known Limitation, D = Important Pre-Submission Fix, E = Non-Blocking Backlog.
 
 ## AUDIT-01
