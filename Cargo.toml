@@ -33,7 +33,7 @@ sha2 = "=0.10.9"
 toml = "=0.8.19"
 hex = "=0.4.3"
 clap = { version = "=4.5.20", features = ["derive"] }
-proptest = "=1.5.0"
+proptest = "=1.11.0"
 # Pinned to the exact version the official rs-soroban-env workspace
 # pins (https://github.com/stellar/rs-soroban-env/blob/main/Cargo.toml,
 # `wasmparser = "=0.116.1"`), because Soroban's host requires this exact
