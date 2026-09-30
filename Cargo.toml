@@ -28,7 +28,7 @@ analyzer-report = { path = "crates/analyzer-report" }
 analyzer-rehearsal = { path = "crates/analyzer-rehearsal" }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
-thiserror = "=2.0.20"
+thiserror = "=2.0.21"
 sha2 = "=0.10.9"
 toml = "=0.8.19"
 hex = "=0.4.3"
