@@ -21,7 +21,7 @@ ureq.workspace = true
 # Pinned transitively via toml_edit to keep the resolved graph on the
 # 1.84.0 MSRV; newer indexmap/toml_edit releases require edition2024.
 indexmap = "=2.5.0"
-toml_edit = "=0.22.20"
+toml_edit = "=0.23.5"
 
 [dev-dependencies]
 proptest.workspace = true
