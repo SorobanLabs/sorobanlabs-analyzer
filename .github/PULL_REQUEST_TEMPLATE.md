@@ -28,3 +28,4 @@ State what this PR intentionally does not change.
 - [ ] No unrelated formatting or dependency churn
 - [ ] No generated attribution or co-author text
 - [ ] No new unverified claims
+- [ ] This PR keeps the change focused, reviewable, and evidence-based
