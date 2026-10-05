@@ -8,8 +8,9 @@
 //! rather than inferred from memory or documentation summaries alone:
 //!
 //! - `soroban-env-host` 28.0.2 is the released version matching this
-//!   workspace's existing `stellar-xdr` (`=28.0.0`) and `wasmparser`
-//!   (`=0.116.1`) pins exactly, and is what `soroban-sdk` 28.0.0 (the
+//!   workspace's `stellar-xdr` (`=28.0.0`) pin and depends on
+//!   `wasmparser` 0.116.1 internally (the workspace itself now uses
+//!   0.221.3 directly, see `Cargo.toml`), and is what `soroban-sdk` 28.0.0 (the
 //!   current released SDK line) itself depends on. Verified against
 //!   <https://github.com/stellar/rs-soroban-env/blob/v28.0.2/Cargo.toml>
 //!   and the published crate's own dependency metadata.

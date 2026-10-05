@@ -1,0 +1,42 @@
+name: Dependency policy
+description: Propose or discuss a dependency update, pin, or ignore rule
+labels: ["dependencies"]
+body:
+  - type: input
+    id: dependency
+    attributes:
+      label: Dependency
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Proposed version
+    validations:
+      required: true
+  - type: textarea
+    id: msrv
+    attributes:
+      label: MSRV impact
+      description: Declared rust-version of the new release and whether it fits the workspace MSRV.
+    validations:
+      required: true
+  - type: textarea
+    id: ci
+    attributes:
+      label: CI impact
+      description: Results of the lint, test, and MSRV jobs, or why they were not run.
+  - type: textarea
+    id: reason
+    attributes:
+      label: Security or maintenance reason
+  - type: dropdown
+    id: dependabot
+    attributes:
+      label: Are Dependabot ignore rules involved?
+      options:
+        - "No"
+        - "Yes, adding an ignore rule"
+        - "Yes, removing an ignore rule"
+    validations:
+      required: true

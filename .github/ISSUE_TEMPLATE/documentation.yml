@@ -1,0 +1,30 @@
+name: Documentation
+description: Something in the docs is unclear, missing, or wrong
+labels: ["documentation"]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page or file
+    validations:
+      required: true
+  - type: textarea
+    id: unclear
+    attributes:
+      label: What is unclear
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested improvement
+  - type: dropdown
+    id: behavior-changed
+    attributes:
+      label: Did analyzer behavior change?
+      options:
+        - "No, documentation only"
+        - "Yes, the docs no longer match behavior"
+        - "Not sure"
+    validations:
+      required: true
