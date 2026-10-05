@@ -5,6 +5,35 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # The workspace declares and tests rust-version 1.84.0. The ranges
+    # below are ignored only because each was observed to fail CI under
+    # that policy. They should be revisited as part of a deliberate MSRV
+    # decision (see issue #14), not removed piecemeal.
+    ignore:
+      # clap 4.6.x requires the edition2024 Cargo feature (issue #14).
+      - dependency-name: "clap"
+        versions: [">= 4.6"]
+      # toml 0.9.x pulls in serde_spanned 1.x, which requires
+      # edition2024 (issue #14).
+      - dependency-name: "toml"
+        versions: [">= 0.9"]
+      # ureq 3.x requires edition2024 and has an incompatible API
+      # (issue #14).
+      - dependency-name: "ureq"
+        versions: [">= 3"]
+      # sha2 0.11 pulls in digest 0.11.x, whose manifest requires
+      # edition2024. Failed the MSRV job in PR #31.
+      - dependency-name: "sha2"
+        versions: [">= 0.11"]
+      # indexmap 2.14.0 and later declare rust-version 1.85. Failed the
+      # MSRV job in PR #32.
+      - dependency-name: "indexmap"
+        versions: [">= 2.14"]
+      # toml_edit 0.23.x fails clippy against the current toml 0.8.19
+      # dependency graph and also failed the MSRV job in PR #34. Revisit
+      # as a coordinated TOML dependency update.
+      - dependency-name: "toml_edit"
+        versions: [">= 0.23"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
