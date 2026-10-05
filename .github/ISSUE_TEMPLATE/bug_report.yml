@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in the analyzer behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If this may be security-sensitive, do not file it here. Follow [SECURITY.md](https://github.com/SorobanLabs/sorobanlabs-analyzer/blob/main/SECURITY.md) for private reporting.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command used
+      placeholder: sorobanlabs-analyzer ...
+    validations:
+      required: true
+  - type: input
+    id: input-type
+    attributes:
+      label: Input type
+      description: For example a WASM file, an XDR snapshot, or an RPC endpoint. Do not attach private artifacts.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Release tag or commit SHA.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      render: text
+  - type: checkboxes
+    id: security
+    attributes:
+      label: Security
+      options:
+        - label: This is not security-sensitive. If it may be, I will use SECURITY.md instead.
+          required: true

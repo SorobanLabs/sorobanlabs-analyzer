@@ -1,0 +1,39 @@
+name: Analysis rule
+description: Propose a change to a rule or finding
+labels: ["enhancement"]
+body:
+  - type: input
+    id: area
+    attributes:
+      label: Rule or finding area
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence source
+      description: Link to the specification, upstream source, or a reproducible fixture.
+    validations:
+      required: true
+  - type: dropdown
+    id: schema
+    attributes:
+      label: Does this change the report schema?
+      options:
+        - "No"
+        - "Yes"
+        - "Not sure"
+    validations:
+      required: true
