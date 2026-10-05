@@ -34,11 +34,13 @@ toml = "=0.8.19"
 hex = "=0.4.3"
 clap = { version = "=4.5.20", features = ["derive"] }
 proptest = "=1.11.0"
-# Pinned to the exact version the official rs-soroban-env workspace
-# pins (https://github.com/stellar/rs-soroban-env/blob/main/Cargo.toml,
-# `wasmparser = "=0.116.1"`), because Soroban's host requires this exact
-# wasmparser release to stay compatible with its Wasmi fork. Do not
-# upgrade independently of that upstream constraint.
+# The analyzer crates parse WASM directly with this version. It is
+# independent of the wasmparser that soroban-env-host resolves: the
+# official rs-soroban-env workspace pins `wasmparser = "=0.116.1"` for
+# its Wasmi fork, and soroban-env-common 28.0.2 still depends on that
+# release. Both versions currently coexist in Cargo.lock (verified with
+# `cargo tree -i wasmparser@0.116.1`). The analyzer does not pass
+# wasmparser types to the host, so the two do not need to match.
 wasmparser = "=0.221.3"
 # stellar-xdr 28.0.0 matches the current released Stellar Protocol 28 /
 # soroban-env-host 28.x line and declares rust-version = "1.84.0"
@@ -63,7 +65,7 @@ stellar-xdr = { version = "=28.0.0", features = ["base64"] }
 # vulnerability is reintroduced by these two pins.
 ureq = "=2.12.1"
 # soroban-env-host 28.0.2 is the released version matching stellar-xdr
-# 28.0.0 and wasmparser 0.116.1 exactly (verified against
+# 28.0.0 and the wasmparser 0.116.1 it depends on internally (verified against
 # https://github.com/stellar/rs-soroban-env/blob/v28.0.2/Cargo.toml,
 # and against soroban-sdk 28.0.0's own declared soroban-env-host
 # dependency, "=28.0.2"). Feasibility (Step 23) was verified by an
