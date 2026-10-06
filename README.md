@@ -117,17 +117,16 @@ audit/       point-in-time audit reports (see each file's own date
 evidence/    the current claim-to-evidence ledger (evidence/index.md)
 examples/    real, runnable examples (see examples/README.md)
 docs/        source for the published documentation book (see below)
-tests/       placeholder at this path: real workspace integration,
+tests/       no test files here: real workspace integration,
              schema, and determinism tests exist under each crate's
-             own tests/ directory instead (#13)
-scripts/     placeholder: no development or CI helper scripts exist
-             yet (#13)
+             own tests/ directory instead
+scripts/     no development or CI helper scripts exist yet
 ```
 
 `examples/` and `docs/` are populated; `tests/` and `scripts/` remain
-intentionally empty placeholders (each README says exactly why). See
-[issue #13](https://github.com/SorobanLabs/sorobanlabs-analyzer/issues/13)
-for the current state of this work.
+intentionally empty (each README says exactly why). This was tracked in
+[issue #13](https://github.com/SorobanLabs/sorobanlabs-analyzer/issues/13),
+which is closed.
 
 ## Status
 
