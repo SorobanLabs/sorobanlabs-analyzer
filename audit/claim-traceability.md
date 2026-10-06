@@ -23,6 +23,8 @@ added in its own 2026-09-24 refresh (claims 43-59 there); the mapping
 between this document's rows and those claim numbers is given in the
 Evidence Ledger Reconciliation section at the end of this file.
 
+Note added 2026-10-06 (rows are not rewritten): `soroban-env-host` was updated from 28.0.2 to 29.0.0 after this refresh (PR #36), and issue #13 was closed on 2026-09-24 after its acceptance criteria were met. Rows that cite 28.0.2 or describe #13 as open reflect the dates recorded in them. See `submission/submission-pack.md` for the current state.
+
 ---
 
 ## A. Core Analyzer Capability

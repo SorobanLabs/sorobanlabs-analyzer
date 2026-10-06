@@ -42,12 +42,12 @@
   read-only, but not wired into the CLI — `analyze` never makes a
   network request. See
   [Architecture](architecture.md#what-is-implemented-vs-library-only).
-- **`examples/`, `docs/`, `scripts/`, and `tests/` scaffold
-  completeness** is tracked in
-  [issue #13](https://github.com/SorobanLabs/sorobanlabs-analyzer/issues/13)
-  and is not necessarily fully resolved at any given point in time —
-  check that issue's current state rather than assuming completeness
-  from this book's existence.
+- **`tests/` and `scripts/` contain only a README.** `tests/` has no
+  test files because the real tests live under each crate's own
+  `tests/` directory, and `scripts/` has none because no helper scripts
+  exist yet. Each README says so. This was tracked in
+  [issue #13](https://github.com/SorobanLabs/sorobanlabs-analyzer/issues/13),
+  which is closed.
 
 ## Repository status
 

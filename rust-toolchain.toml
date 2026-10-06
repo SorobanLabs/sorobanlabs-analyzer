@@ -1,7 +1,7 @@
 # Development/CI toolchain. This is deliberately newer than the
 # workspace's declared MSRV (workspace.package.rust-version = "1.84.0"
 # in Cargo.toml, chosen to match the rust-version stellar-xdr 28.0.0
-# and soroban-env-host both declare). Rust 1.98.1 is pinned here mainly
+# and soroban-env-host 29.0.0 both declare). Rust 1.98.1 is pinned here mainly
 # because Cargo releases before 1.94.1 carry CVE-2026-33056 (a `tar`
 # extraction flaw that lets a malicious crate change filesystem
 # permissions during `cargo build`); building and running CI on a
