@@ -37,15 +37,15 @@ proptest = "=1.11.0"
 # The analyzer crates parse WASM directly with this version. It is
 # independent of the wasmparser that soroban-env-host resolves: the
 # official rs-soroban-env workspace pins `wasmparser = "=0.116.1"` for
-# its Wasmi fork, and soroban-env-common 28.0.2 still depends on that
+# its Wasmi fork, and soroban-env-common 29.0.0 still depends on that
 # release. Both versions currently coexist in Cargo.lock (verified with
 # `cargo tree -i wasmparser@0.116.1`). The analyzer does not pass
 # wasmparser types to the host, so the two do not need to match.
 wasmparser = "=0.221.3"
-# stellar-xdr 28.0.0 matches the current released Stellar Protocol 28 /
-# soroban-env-host 28.x line and declares rust-version = "1.84.0"
-# (verified against https://github.com/stellar/rs-stellar-xdr), so it
-# fits this workspace's MSRV without modification. Default features
+# stellar-xdr 28.0.0 declares rust-version = "1.84.0" (verified against
+# the published crate manifest), so it fits this workspace's MSRV without
+# modification. soroban-env-host 29.0.0 resolves to this same single
+# stellar-xdr 28.0.0 in Cargo.lock (`cargo tree -i stellar-xdr`). Default features
 # (`std`, `curr`) are used: `curr` tracks the current protocol XDR.
 stellar-xdr = { version = "=28.0.0", features = ["base64"] }
 # ureq's 3.x line declares MSRV 1.85 (above this workspace's 1.84.0);
@@ -64,14 +64,13 @@ stellar-xdr = { version = "=28.0.0", features = ["base64"] }
 # version RUSTSEC-2024-0421 was fixed in (1.0.3), so no known
 # vulnerability is reintroduced by these two pins.
 ureq = "=2.12.1"
-# soroban-env-host 28.0.2 is the released version matching stellar-xdr
-# 28.0.0 and the wasmparser 0.116.1 it depends on internally (verified against
-# https://github.com/stellar/rs-soroban-env/blob/v28.0.2/Cargo.toml,
-# and against soroban-sdk 28.0.0's own declared soroban-env-host
-# dependency, "=28.0.2"). Feasibility (Step 23) was verified by an
-# actual local build and a real invocation of a stellar-cli-built
-# Soroban contract through this exact dependency, not by inspection
-# alone. `testutils` is enabled: it is the officially-supported path
+# soroban-env-host 29.0.0 declares rust-version = "1.84.0" and depends on
+# wasmparser 0.116.1 internally. It was updated from 28.0.2 in PR #36 and
+# builds under the 1.84.0 MSRV job with the same Cargo.lock pins described
+# below. Feasibility was first verified by an actual local build and a real
+# invocation of a stellar-cli-built Soroban contract through this
+# dependency (then at 28.0.2); the workspace test suite, including the
+# rehearsal tests, passes against 29.0.0. `testutils` is enabled: it is the officially-supported path
 # for loading and invoking a WASM contract without also constructing
 # the full transaction-level footprint/resource XDR that the
 # production `e2e_invoke::invoke_host_function` entry point expects;

@@ -7,13 +7,12 @@
 //! against the actual official source and an actual local build,
 //! rather than inferred from memory or documentation summaries alone:
 //!
-//! - `soroban-env-host` 28.0.2 is the released version matching this
-//!   workspace's `stellar-xdr` (`=28.0.0`) pin and depends on
-//!   `wasmparser` 0.116.1 internally (the workspace itself now uses
-//!   0.221.3 directly, see `Cargo.toml`), and is what `soroban-sdk` 28.0.0 (the
-//!   current released SDK line) itself depends on. Verified against
-//!   <https://github.com/stellar/rs-soroban-env/blob/v28.0.2/Cargo.toml>
-//!   and the published crate's own dependency metadata.
+//! - `soroban-env-host` 29.0.0 is the version now pinned (updated from
+//!   28.0.2 in PR #36). It resolves to the same single `stellar-xdr`
+//!   (`=28.0.0`) as the rest of the workspace and depends on `wasmparser`
+//!   0.116.1 internally (the workspace itself uses 0.221.3 directly, see
+//!   `Cargo.toml`). The test fixtures are still built with `soroban-sdk`
+//!   28.0.0, and the rehearsal tests pass against this host version.
 //! - It builds under this workspace's declared MSRV, rustc 1.84.0,
 //!   after five additional transitive `Cargo.lock` pins (documented in
 //!   the workspace `Cargo.toml`, next to the dependency declaration);
