@@ -13,6 +13,8 @@ only rows that were newly added or actually re-verified on 2026-09-24
 carry that date. No row was deleted; corrections to stale rows are
 recorded in their own Notes rather than by silently rewriting history.
 
+Note added 2026-10-06 (rows below are not rewritten): after the dates recorded here, `soroban-env-host` was updated from 28.0.2 to 29.0.0 (PR #36, affects the rehearsal rows), and issue #13 was closed on 2026-09-24 after its acceptance criteria were met (affects the scaffold-directory rows). The "3 open issues" count in the issue-tracker row is no longer current: #12 and #14 are open. See `submission/submission-pack.md` for the current state.
+
 ## Evidence States
 
 | State | Meaning |
