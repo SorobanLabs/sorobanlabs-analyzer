@@ -90,7 +90,7 @@ ureq = "=2.12.1"
 # the zeroize 1.8.1 already pinned above). Each is a RustCrypto-ecosystem
 # utility crate; no RustSec advisory was found for any pinned or newer
 # version at the time this was written.
-soroban-env-host = { version = "=28.0.2", features = ["testutils"] }
+soroban-env-host = { version = "=29.0.0", features = ["testutils"] }
 
 [profile.release]
 opt-level = "z"
