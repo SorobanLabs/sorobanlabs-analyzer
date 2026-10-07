@@ -41,7 +41,7 @@ proptest = "=1.11.0"
 # release. Both versions currently coexist in Cargo.lock (verified with
 # `cargo tree -i wasmparser@0.116.1`). The analyzer does not pass
 # wasmparser types to the host, so the two do not need to match.
-wasmparser = "=0.221.3"
+wasmparser = "=0.246.2"
 # stellar-xdr 28.0.0 declares rust-version = "1.84.0" (verified against
 # the published crate manifest), so it fits this workspace's MSRV without
 # modification. soroban-env-host 29.0.0 resolves to this same single
