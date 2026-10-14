@@ -33,7 +33,7 @@ sha2 = "=0.10.9"
 toml = "=0.8.19"
 hex = "=0.4.3"
 clap = { version = "=4.5.20", features = ["derive"] }
-proptest = "=1.11.0"
+proptest = "=1.12.0"
 # The analyzer crates parse WASM directly with this version. It is
 # independent of the wasmparser that soroban-env-host resolves: the
 # official rs-soroban-env workspace pins `wasmparser = "=0.116.1"` for
